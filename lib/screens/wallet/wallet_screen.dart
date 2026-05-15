@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../blocs/wallet/wallet_bloc.dart';
@@ -6,28 +7,6 @@ import '../../core/app_design.dart';
 
 class WalletScreen extends StatelessWidget {
   const WalletScreen({super.key});
-
-  Widget _field({
-    required TextEditingController ctrl,
-    required String hint,
-    required IconData icon,
-    TextInputType keyboard = TextInputType.text,
-  }) =>
-      Container(
-        decoration: BoxDecoration(color: D.fieldBg, borderRadius: D.r16),
-        child: TextField(
-          controller: ctrl,
-          keyboardType: keyboard,
-          style: const TextStyle(color: D.white, fontWeight: FontWeight.w600),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: const TextStyle(color: D.textSub),
-            prefixIcon: Icon(icon, color: D.textSub),
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(vertical: 16),
-          ),
-        ),
-      );
 
   void _confirmDelete(BuildContext context, String cardId, String nickname) {
     showDialog(
@@ -59,150 +38,48 @@ class WalletScreen extends StatelessWidget {
   }
 
   void _showAddCard(BuildContext context) {
-    final nicknameCtrl = TextEditingController();
-    final panCtrl = TextEditingController();
-    final expiryCtrl = TextEditingController();
-    String selectedType = 'Visa';
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => BlocProvider.value(
         value: context.read<WalletBloc>(),
-        child: StatefulBuilder(
-          builder: (ctx, set) => Padding(
-            padding:
-                EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-            child: Container(
-              decoration: const BoxDecoration(
-                color: D.cardBg,
-                borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(32)),
-              ),
-              padding: const EdgeInsets.all(28),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40, height: 4,
-                      decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
-                          borderRadius: D.r12),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text('Add New Card',
-                      style: TextStyle(
-                          color: D.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 20),
-                  _field(
-                      ctrl: nicknameCtrl,
-                      hint: 'Card nickname (e.g. My Visa)',
-                      icon: Icons.label_outline_rounded),
-                  const SizedBox(height: 12),
-                  _field(
-                      ctrl: panCtrl,
-                      hint: 'Card number ',
-                      icon: Icons.credit_card_rounded,
-                      keyboard: TextInputType.number),
-                  const SizedBox(height: 12),
-                  _field(
-                      ctrl: expiryCtrl,
-                      hint: 'Expiry  MM/YY',
-                      icon: Icons.calendar_today_rounded),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: ['Visa', 'Mastercard', 'Amex']
-                        .map((t) => Expanded(
-                              child: GestureDetector(
-                                onTap: () => set(() => selectedType = t),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  margin: EdgeInsets.only(
-                                      right: t != 'Amex' ? 10 : 0),
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: selectedType == t
-                                        ? D.cyan
-                                        : D.fieldBg,
-                                    borderRadius: D.r12,
-                                    border: Border.all(
-                                        color: selectedType == t
-                                            ? D.cyan
-                                            : Colors.white.withOpacity(0.07)),
-                                    boxShadow: selectedType == t
-                                        ? [
-                                            BoxShadow(
-                                                color:
-                                                    D.cyan.withOpacity(0.28),
-                                                blurRadius: 10)
-                                          ]
-                                        : [],
-                                  ),
-                                  child: Text(t,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                          color: selectedType == t
-                                              ? const Color(0xFF0D1A1C)
-                                              : D.textSub,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 12)),
-                                ),
-                              ),
-                            ))
-                        .toList(),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        if (nicknameCtrl.text.isEmpty ||
-                            panCtrl.text.isEmpty ||
-                            expiryCtrl.text.isEmpty) return;
-                        ctx.read<WalletBloc>().add(WalletCardAdded(
-                              nickname: nicknameCtrl.text,
-                              maskedPan: panCtrl.text,
-                              expiry: expiryCtrl.text,
-                              type: selectedType,
-                            ));
-                        Navigator.pop(ctx);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: D.orange,
-                        foregroundColor: D.white,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: D.r16),
-                        elevation: 0,
-                      ),
-                      child: const Text('Save Card',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w900, fontSize: 15)),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ),
-            ),
-          ),
-        ),
+        child: const _AddCardSheet(),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<WalletBloc, WalletState>(
+    return BlocConsumer<WalletBloc, WalletState>(
+      listener: (context, state) {
+        if (state is WalletError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: D.orange,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
       builder: (context, state) {
-        final cards = state is WalletData ? state.cards : <CardModel>[];
-        final primaryId = state is WalletData ? state.primaryCardId : null;
+        if (state is WalletLoading) {
+          return const Center(
+            child: CircularProgressIndicator(color: D.cyan),
+          );
+        }
+
+        final cards = state is WalletData
+            ? state.cards
+            : state is WalletError
+                ? state.cards
+                : <CardModel>[];
+        final primaryId = state is WalletData
+            ? state.primaryCardId
+            : state is WalletError
+                ? state.primaryCardId
+                : null;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -450,6 +327,349 @@ class WalletScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+// ── Card number input formatter ────────────────────────────────────────────────
+
+class _CardNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final limited = digits.length > 16 ? digits.substring(0, 16) : digits;
+    final buffer = StringBuffer();
+    for (int i = 0; i < limited.length; i++) {
+      if (i > 0 && i % 4 == 0) buffer.write('  ');
+      buffer.write(limited[i]);
+    }
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+// ── Add Card bottom sheet ──────────────────────────────────────────────────────
+
+class _AddCardSheet extends StatefulWidget {
+  const _AddCardSheet();
+
+  @override
+  State<_AddCardSheet> createState() => _AddCardSheetState();
+}
+
+class _AddCardSheetState extends State<_AddCardSheet> {
+  final _holderCtrl = TextEditingController();
+  final _numberCtrl = TextEditingController();
+  final _monthCtrl = TextEditingController();
+  final _yearCtrl = TextEditingController();
+  final _yearFocus = FocusNode();
+
+  String? _holderError;
+  String? _numberError;
+  String? _expiryError;
+
+  @override
+  void dispose() {
+    _holderCtrl.dispose();
+    _numberCtrl.dispose();
+    _monthCtrl.dispose();
+    _yearCtrl.dispose();
+    _yearFocus.dispose();
+    super.dispose();
+  }
+
+  String get _rawDigits => _numberCtrl.text.replaceAll(RegExp(r'\s'), '');
+
+  String get _cardType {
+    final d = _rawDigits;
+    if (d.isEmpty) return '';
+    if (d.length >= 2 && (d.startsWith('34') || d.startsWith('37'))) {
+      return 'Amex';
+    }
+    if (d.startsWith('4')) return 'Visa';
+    if (d.startsWith('5')) return 'Mastercard';
+    return '';
+  }
+
+  Color _typeAccent(String type) {
+    if (type == 'Visa') return const Color(0xFF4B79FF);
+    if (type == 'Mastercard') return const Color(0xFFEB001B);
+    if (type == 'Amex') return D.cyan;
+    return Colors.transparent;
+  }
+
+  bool _validate() {
+    String? he, ne, ee;
+    bool ok = true;
+
+    if (_holderCtrl.text.trim().isEmpty) {
+      he = 'Card holder name is required';
+      ok = false;
+    }
+
+    final d = _rawDigits;
+    if (d.isEmpty) {
+      ne = 'Card number is required';
+      ok = false;
+    } else if (d.length < 13 || d.length > 19) {
+      ne = 'Card number must be 13–19 digits';
+      ok = false;
+    }
+
+    final month = int.tryParse(_monthCtrl.text.trim());
+    final year = int.tryParse(_yearCtrl.text.trim());
+    final now = DateTime.now();
+    if (month == null || month < 1 || month > 12) {
+      ee = 'Enter a valid month (01–12)';
+      ok = false;
+    } else if (year == null ||
+        _yearCtrl.text.trim().length != 4 ||
+        year < now.year) {
+      ee = 'Enter a valid expiry year';
+      ok = false;
+    }
+
+    setState(() {
+      _holderError = he;
+      _numberError = ne;
+      _expiryError = ee;
+    });
+    return ok;
+  }
+
+  void _submit() {
+    if (!_validate()) return;
+    context.read<WalletBloc>().add(WalletCardAdded(
+          cardHolderName: _holderCtrl.text.trim(),
+          cardNumber: _rawDigits,
+          expiryMonth: int.parse(_monthCtrl.text.trim()),
+          expiryYear: int.parse(_yearCtrl.text.trim()),
+        ));
+    Navigator.pop(context);
+  }
+
+  InputDecoration _fieldDec(
+    String hint, {
+    Widget? prefix,
+    Widget? suffix,
+  }) =>
+      InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: D.textSub, fontSize: 13),
+        filled: true,
+        fillColor: D.fieldBg,
+        border: OutlineInputBorder(
+            borderRadius: D.r16, borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: D.r16,
+          borderSide:
+              BorderSide(color: Colors.white.withOpacity(0.07), width: 1),
+        ),
+        focusedBorder: const OutlineInputBorder(
+          borderRadius: D.r16,
+          borderSide: BorderSide(color: D.cyan, width: 1.5),
+        ),
+        errorBorder: const OutlineInputBorder(
+          borderRadius: D.r16,
+          borderSide: BorderSide(color: D.orange, width: 1.2),
+        ),
+        focusedErrorBorder: const OutlineInputBorder(
+          borderRadius: D.r16,
+          borderSide: BorderSide(color: D.orange, width: 1.5),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        prefixIcon: prefix,
+        suffixIcon: suffix,
+        errorStyle: const TextStyle(color: D.orange, fontSize: 11),
+      );
+
+  Widget _label(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Text(text,
+            style: const TextStyle(
+                color: D.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                letterSpacing: 0.2)),
+      );
+
+  Widget _cardTypeBadge() {
+    final type = _cardType;
+    if (type.isEmpty) return const SizedBox.shrink();
+    final accent = _typeAccent(type);
+    return Container(
+      margin: const EdgeInsets.only(right: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: accent.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: accent.withOpacity(0.45), width: 1),
+      ),
+      child: Text(
+        type.toUpperCase(),
+        style: TextStyle(
+            color: accent,
+            fontWeight: FontWeight.w900,
+            fontSize: 9,
+            letterSpacing: 0.8),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: D.cardBg,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text('Add New Card',
+                style: TextStyle(
+                    color: D.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900)),
+            const SizedBox(height: 4),
+            const Text('Your card details are securely stored.',
+                style: TextStyle(color: D.textSub, fontSize: 12)),
+            const SizedBox(height: 24),
+
+            // Card Holder Name
+            _label('Card Holder Name'),
+            TextField(
+              controller: _holderCtrl,
+              textCapitalization: TextCapitalization.words,
+              style: const TextStyle(
+                  color: D.white, fontWeight: FontWeight.w600),
+              decoration: _fieldDec(
+                'e.g. John Doe',
+                prefix: const Icon(Icons.person_outline_rounded,
+                    color: D.textSub, size: 20),
+              ).copyWith(errorText: _holderError),
+            ),
+            const SizedBox(height: 18),
+
+            // Card Number
+            _label('Card Number'),
+            TextField(
+              controller: _numberCtrl,
+              keyboardType: TextInputType.number,
+              inputFormatters: [_CardNumberFormatter()],
+              onChanged: (_) => setState(() {}),
+              style: const TextStyle(
+                  color: D.white,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 2,
+                  fontSize: 15),
+              decoration: _fieldDec(
+                '0000  0000  0000  0000',
+                prefix: const Icon(Icons.credit_card_rounded,
+                    color: D.textSub, size: 20),
+                suffix: Align(
+                  widthFactor: 1.0,
+                  alignment: Alignment.centerRight,
+                  child: _cardTypeBadge(),
+                ),
+              ).copyWith(errorText: _numberError),
+            ),
+            const SizedBox(height: 18),
+
+            // Expiry Date
+            _label('Expiry Date'),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Month
+                Expanded(
+                  child: TextField(
+                    controller: _monthCtrl,
+                    keyboardType: TextInputType.number,
+                    maxLength: 2,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    onChanged: (v) {
+                      if (v.length == 2) _yearFocus.requestFocus();
+                    },
+                    style: const TextStyle(
+                        color: D.white, fontWeight: FontWeight.w600),
+                    decoration: _fieldDec('MM').copyWith(
+                      counterText: '',
+                      // Show red border on error without repeating the message
+                      errorText: _expiryError != null ? '' : null,
+                      errorStyle: const TextStyle(fontSize: 0, height: 0),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Year
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: _yearCtrl,
+                    focusNode: _yearFocus,
+                    keyboardType: TextInputType.number,
+                    maxLength: 4,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    style: const TextStyle(
+                        color: D.white, fontWeight: FontWeight.w600),
+                    decoration: _fieldDec('YYYY').copyWith(counterText: ''),
+                  ),
+                ),
+              ],
+            ),
+            if (_expiryError != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6, left: 4),
+                child: Text(_expiryError!,
+                    style:
+                        const TextStyle(color: D.orange, fontSize: 11)),
+              ),
+
+            const SizedBox(height: 28),
+
+            // Submit
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: D.orange,
+                  foregroundColor: D.white,
+                  shape: RoundedRectangleBorder(borderRadius: D.r16),
+                  elevation: 0,
+                  shadowColor: Colors.transparent,
+                ),
+                child: const Text('Save Card',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w900, fontSize: 15)),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

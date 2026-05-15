@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+
+import '../constants/api_constants.dart';
 import '../../services/token_storage_service.dart';
 
 class AuthInterceptor extends Interceptor {
@@ -49,10 +51,13 @@ class AuthInterceptor extends Interceptor {
         return;
       }
 
-      final refreshDio = Dio(BaseOptions(baseUrl: baseUrl));
+      final refreshDio = Dio(BaseOptions(
+        baseUrl: baseUrl,
+        headers: const {'ngrok-skip-browser-warning': 'true'},
+      ));
 
       final refreshResponse = await refreshDio.post(
-        '/auth/refresh',
+        ApiConstants.refreshToken,
         data: {'refresh_token': refreshToken},
       );
 

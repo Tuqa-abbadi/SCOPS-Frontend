@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../blocs/services/services_bloc.dart';
@@ -397,7 +397,7 @@ class _ServicesBrowserScreenState extends State<ServicesBrowserScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "Can’t find your service?",
+                    "Can't find your service?",
                     style: TextStyle(
                       color: _white,
                       fontSize: 16,

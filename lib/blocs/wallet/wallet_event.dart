@@ -11,18 +11,18 @@ class WalletLoaded extends WalletEvent {
 }
 
 class WalletCardAdded extends WalletEvent {
-  final String nickname;
-  final String maskedPan;
-  final String expiry;
-  final String type;
+  final String cardHolderName;
+  final String cardNumber;
+  final int expiryMonth;
+  final int expiryYear;
   const WalletCardAdded({
-    required this.nickname,
-    required this.maskedPan,
-    required this.expiry,
-    required this.type,
+    required this.cardHolderName,
+    required this.cardNumber,
+    required this.expiryMonth,
+    required this.expiryYear,
   });
   @override
-  List<Object> get props => [maskedPan];
+  List<Object> get props => [cardNumber];
 }
 
 class WalletCardDeleted extends WalletEvent {

@@ -1,4 +1,6 @@
-part of 'auth_bloc.dart';
+import 'package:equatable/equatable.dart';
+
+import '../../models/user_model.dart';
 
 abstract class AuthState extends Equatable {
   const AuthState();
@@ -6,8 +8,6 @@ abstract class AuthState extends Equatable {
   @override
   List<Object> get props => [];
 }
-
-// --- Shared ---
 
 class AuthInitial extends AuthState {
   const AuthInitial();
@@ -18,33 +18,33 @@ class AuthLoading extends AuthState {
 }
 
 class AuthSuccess extends AuthState {
-  final String message;
   const AuthSuccess({required this.message});
+
+  final String message;
 
   @override
   List<Object> get props => [message];
 }
 
 class AuthFailure extends AuthState {
-  final String error;
   const AuthFailure({required this.error});
+
+  final String error;
 
   @override
   List<Object> get props => [error];
 }
 
-// --- Login ---
-
 class LoginState extends AuthState {
-  final bool showPassword;
-  final bool isLoading;
-  final String? errorMessage;
-
   const LoginState({
     this.showPassword = false,
     this.isLoading = false,
     this.errorMessage,
   });
+
+  final bool showPassword;
+  final bool isLoading;
+  final String? errorMessage;
 
   LoginState copyWith({
     bool? showPassword,
@@ -64,23 +64,26 @@ class LoginState extends AuthState {
 }
 
 class LoginSuccess extends AuthState {
-  const LoginSuccess();
+  const LoginSuccess({this.user});
+
+  final UserModel? user;
+
+  @override
+  List<Object> get props => [if (user != null) user!];
 }
 
-// --- Signup ---
-
 class SignupState extends AuthState {
-  final int currentStep;
-  final bool showPassword;
-  final bool isLoading;
-  final String? errorMessage;
-
   const SignupState({
     this.currentStep = 0,
     this.showPassword = false,
     this.isLoading = false,
     this.errorMessage,
   });
+
+  final int currentStep;
+  final bool showPassword;
+  final bool isLoading;
+  final String? errorMessage;
 
   SignupState copyWith({
     int? currentStep,
@@ -98,7 +101,12 @@ class SignupState extends AuthState {
   }
 
   @override
-  List<Object> get props => [currentStep, showPassword, isLoading, errorMessage ?? ''];
+  List<Object> get props => [
+        currentStep,
+        showPassword,
+        isLoading,
+        errorMessage ?? '',
+      ];
 }
 
 class SignupSuccess extends AuthState {
@@ -107,4 +115,55 @@ class SignupSuccess extends AuthState {
 
 class SignupGoBack extends AuthState {
   const SignupGoBack();
+}
+
+class LogoutInProgress extends AuthState {
+  const LogoutInProgress();
+}
+
+class LogoutSuccess extends AuthState {
+  const LogoutSuccess();
+}
+
+class LogoutFailure extends AuthState {
+  const LogoutFailure({required this.error});
+
+  final String error;
+
+  @override
+  List<Object> get props => [error];
+}
+
+class ForgotPasswordState extends AuthState {
+  const ForgotPasswordState({
+    this.isLoading = false,
+    this.errorMessage,
+    this.successMessage,
+  });
+
+  final bool isLoading;
+  final String? errorMessage;
+  final String? successMessage;
+
+  ForgotPasswordState copyWith({
+    bool? isLoading,
+    String? errorMessage,
+    String? successMessage,
+    bool clearError = false,
+    bool clearSuccess = false,
+  }) {
+    return ForgotPasswordState(
+      isLoading: isLoading ?? this.isLoading,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      successMessage:
+          clearSuccess ? null : (successMessage ?? this.successMessage),
+    );
+  }
+
+  @override
+  List<Object> get props => [
+        isLoading,
+        errorMessage ?? '',
+        successMessage ?? '',
+      ];
 }

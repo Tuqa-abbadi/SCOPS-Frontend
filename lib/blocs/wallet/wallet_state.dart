@@ -1,24 +1,5 @@
 part of 'wallet_bloc.dart';
 
-class CardModel extends Equatable {
-  final String id;
-  final String nickname;
-  final String maskedPan;
-  final String expiry;
-  final String type;
-
-  const CardModel({
-    required this.id,
-    required this.nickname,
-    required this.maskedPan,
-    required this.expiry,
-    required this.type,
-  });
-
-  @override
-  List<Object> get props => [id];
-}
-
 abstract class WalletState extends Equatable {
   const WalletState();
   @override
@@ -29,10 +10,32 @@ class WalletInitial extends WalletState {
   const WalletInitial();
 }
 
+class WalletLoading extends WalletState {
+  const WalletLoading();
+}
+
 class WalletData extends WalletState {
+  const WalletData({required this.cards, required this.primaryCardId});
+
   final List<CardModel> cards;
   final String? primaryCardId;
-  const WalletData({required this.cards, required this.primaryCardId});
+
   @override
   List<Object?> get props => [cards, primaryCardId];
+}
+
+// Carries the last known card list so the UI stays visible during brief error states.
+class WalletError extends WalletState {
+  const WalletError({
+    required this.message,
+    this.cards = const [],
+    this.primaryCardId,
+  });
+
+  final String message;
+  final List<CardModel> cards;
+  final String? primaryCardId;
+
+  @override
+  List<Object?> get props => [message, cards, primaryCardId];
 }

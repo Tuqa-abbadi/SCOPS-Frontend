@@ -9,8 +9,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../blocs/auth/auth_bloc.dart';
+import '../../blocs/profile/change_password_bloc.dart';
 import '../../blocs/subscription/subscription_bloc.dart';
+import '../../blocs/user/user_cubit.dart';
 import '../../blocs/wallet/wallet_bloc.dart';
+import '../../models/user_model.dart';
+import '../auth/auth_choice_screen.dart';
+import 'change_password_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../feedback/feedback_screen.dart';
 import '../analytics/spending_analytics_screen.dart';
@@ -143,7 +149,7 @@ class ProfileScreen extends StatelessWidget {
         },
       );
 
-  Widget _avatar() => Center(
+  Widget _avatar(UserModel? user) => Center(
         child: Column(
           children: [
             Stack(
@@ -165,9 +171,12 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   child: Container(
                     decoration: const BoxDecoration(shape: BoxShape.circle, color: _card),
-                    child: const Center(
-                      child: Text('U',
-                          style: TextStyle(color: _white, fontSize: 40, fontWeight: FontWeight.w900)),
+                    child: Center(
+                      child: Text(
+                          user?.firstName.isNotEmpty == true
+                              ? user!.firstName[0].toUpperCase()
+                              : 'U',
+                          style: const TextStyle(color: _white, fontSize: 40, fontWeight: FontWeight.w900)),
                     ),
                   ),
                 ),
@@ -182,8 +191,9 @@ class ProfileScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            const Text('User',
-                style: TextStyle(color: _white, fontSize: 18, fontWeight: FontWeight.w900)),
+            Text(
+                user?.fullName.isNotEmpty == true ? user!.fullName : 'User',
+                style: const TextStyle(color: _white, fontSize: 18, fontWeight: FontWeight.w900)),
             const SizedBox(height: 5),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
@@ -192,8 +202,9 @@ class ProfileScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: Colors.white.withOpacity(0.08)),
               ),
-              child: const Text('user@scops.app',
-                  style: TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w500)),
+              child: Text(
+                  user?.email.isNotEmpty == true ? user!.email : '',
+                  style: const TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w500)),
             ),
           ],
         ),
@@ -214,7 +225,10 @@ class ProfileScreen extends StatelessWidget {
               onPressed: () => Navigator.pop(context),
               child: const Text('Cancel', style: TextStyle(color: _muted))),
           TextButton(
-              onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
+              onPressed: () {
+                Navigator.pop(context);
+                context.read<LogoutBloc>().add(const LogoutRequested());
+              },
               child: const Text('Log Out',
                   style: TextStyle(color: _orange, fontWeight: FontWeight.w900))),
         ],
@@ -224,7 +238,17 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return BlocListener<LogoutBloc, AuthState>(
+      listener: (context, state) {
+        if (state is LogoutSuccess) {
+          context.read<UserCubit>().clearUser();
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const AuthChoiceScreen()),
+            (route) => false,
+          );
+        }
+      },
+      child: Container(
       color: _bg,
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -258,7 +282,9 @@ class ProfileScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 22),
-            _avatar(),
+            BlocBuilder<UserCubit, UserModel?>(
+              builder: (context, user) => _avatar(user),
+            ),
             const SizedBox(height: 22),
             _statsCard(),
             const SizedBox(height: 22),
@@ -266,8 +292,20 @@ class ProfileScreen extends StatelessWidget {
             _section('Account'),
             _tile(icon: Icons.person_outline_rounded,
                 title: 'Edit Profile', subtitle: 'Update your name and photo'),
-            _tile(icon: Icons.lock_outline_rounded,
-                title: 'Change Password', subtitle: 'Update your password'),
+            _tile(
+              icon: Icons.lock_outline_rounded,
+              title: 'Change Password',
+              subtitle: 'Update your password',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => BlocProvider.value(
+                    value: context.read<ChangePasswordBloc>(),
+                    child: const ChangePasswordScreen(),
+                  ),
+                ),
+              ),
+            ),
             _tile(
               icon: Icons.notifications_outlined,
               title: 'Notifications',
@@ -330,6 +368,7 @@ class ProfileScreen extends StatelessWidget {
           ],
         ),
       ),
+    ),
     );
   }
 }

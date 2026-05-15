@@ -1,4 +1,4 @@
-import 'dart:ui';
+﻿import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -16,7 +16,8 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final PageController _pageController = PageController();
 
-  final nameController = TextEditingController();
+  final firstNameController = TextEditingController();
+  final lastNameController = TextEditingController();
   final emailController = TextEditingController();
   final phoneController = TextEditingController();
   final passwordController = TextEditingController();
@@ -33,7 +34,7 @@ class _SignupScreenState extends State<SignupScreen> {
   ];
 
   final List<String> subtitles = [
-    'Let’s personalize your SCOPS account.',
+    'Enter your first and last name.',
     'Use an email you can access.',
     'Add your phone for account verification.',
     'Protect your subscription data.',
@@ -42,7 +43,8 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   void dispose() {
     _pageController.dispose();
-    nameController.dispose();
+    firstNameController.dispose();
+    lastNameController.dispose();
     emailController.dispose();
     phoneController.dispose();
     passwordController.dispose();
@@ -53,14 +55,10 @@ class _SignupScreenState extends State<SignupScreen> {
     if (state.currentStep < 3) {
       context.read<SignupBloc>().add(const SignupNextStep());
     } else {
-      final parts = nameController.text.trim().split(' ');
-      final firstName = parts.isNotEmpty ? parts.first : '';
-      final middleName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
-
       context.read<SignupBloc>().add(
             SignupSubmitted(
-              firstName: firstName,
-              middleName: middleName,
+              firstName: firstNameController.text.trim(),
+              lastName: lastNameController.text.trim(),
               email: emailController.text.trim(),
               phone: phoneController.text.trim(),
               password: passwordController.text,
@@ -202,10 +200,20 @@ class _SignupScreenState extends State<SignupScreen> {
   ) {
     switch (index) {
       case 0:
-        return _inputField(
-          controller: nameController,
-          hint: 'Full name',
-          icon: Icons.person_outline_rounded,
+        return Column(
+          children: [
+            _inputField(
+              controller: firstNameController,
+              hint: 'First name',
+              icon: Icons.person_outline_rounded,
+            ),
+            const SizedBox(height: 12),
+            _inputField(
+              controller: lastNameController,
+              hint: 'Last name',
+              icon: Icons.person_outline_rounded,
+            ),
+          ],
         );
       case 1:
         return _inputField(
@@ -342,8 +350,10 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Widget _cardSlider(SignupState state, BuildContext context) {
-    return SizedBox(
-      height: 245,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+      height: state.currentStep == 0 ? 315 : 245,
       child: PageView.builder(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(),

@@ -1,91 +1,49 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import '../repositories/auth_repository.dart';
 
+@Deprecated('Use AuthRepository or AuthApiService for authentication calls.')
 class AuthService {
-  final String baseUrl = 'https://6d16cb53-a851-4863-a1b3-d08fdd92c9be.mock.pstmn.io';
+  AuthService({AuthRepository? authRepository})
+      : _authRepository = authRepository ?? AuthRepository();
 
-  // 🔹 LOGIN
+  final AuthRepository _authRepository;
+
   Future<Map<String, dynamic>> login({
     required String email,
     required String password,
   }) async {
-    final url = Uri.parse('$baseUrl/login');
+    final result = await _authRepository.login(
+      email: email,
+      password: password,
+    );
 
-    try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-        }),
-      );
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        return {
-          'success': true,
-          'message': data['message'],
-          'token': data['token'],
-          'user': data['user'],
-        };
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Login failed',
-        };
-      }
-    } catch (e) {
-      return {
-        'success': false,
-        'message': 'Error: $e',
-      };
-    }
+    return _toMap(result);
   }
 
-  // 🔹 SIGNUP
   Future<Map<String, dynamic>> signup({
     required String firstName,
-    required String middleName,
+    required String lastName,
     required String email,
     required String phone,
     required String password,
   }) async {
-    final url = Uri.parse('$baseUrl/signup');
+    final result = await _authRepository.signup(
+      firstName: firstName,
+      lastName: lastName,
+      email: email,
+      phone: phone,
+      password: password,
+    );
 
-    try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'first_name': firstName,
-          'middle_name': middleName,
-          'email': email,
-          'phone': phone,
-          'password': password,
-        }),
-      );
+    return _toMap(result);
+  }
 
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        return {
-          'success': true,
-          'message': data['message'],
-          'user': data['user'],
-        };
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Signup failed',
-        };
-      }
-    } catch (e) {
-      return {
-        'success': false,
-        'message': 'Error: $e',
-      };
-    }
+  Map<String, dynamic> _toMap(AuthResult result) {
+    return {
+      'success': result.success,
+      'message': result.message,
+      'token': result.accessToken,
+      'refresh_token': result.refreshToken,
+      'user': result.user,
+    };
   }
 }

@@ -1,4 +1,4 @@
-part of 'auth_bloc.dart';
+import 'package:equatable/equatable.dart';
 
 abstract class AuthEvent extends Equatable {
   const AuthEvent();
@@ -8,10 +8,13 @@ abstract class AuthEvent extends Equatable {
 }
 
 class LoginSubmitted extends AuthEvent {
+  const LoginSubmitted({
+    required this.email,
+    required this.password,
+  });
+
   final String email;
   final String password;
-
-  const LoginSubmitted({required this.email, required this.password});
 
   @override
   List<Object> get props => [email, password];
@@ -26,30 +29,40 @@ class SignupPreviousStep extends AuthEvent {
 }
 
 class SignupPageChanged extends AuthEvent {
-  final int step;
   const SignupPageChanged(this.step);
+
+  final int step;
 
   @override
   List<Object> get props => [step];
 }
 
 class SignupSubmitted extends AuthEvent {
-  final String firstName;
-  final String middleName;
-  final String email;
-  final String phone;
-  final String password;
-
   const SignupSubmitted({
     required this.firstName,
-    required this.middleName,
+    required this.lastName,
     required this.email,
     required this.phone,
     required this.password,
   });
 
+  final String firstName;
+  final String lastName;
+  final String email;
+  final String phone;
+  final String password;
+
   @override
-  List<Object> get props => [firstName, middleName, email, phone, password];
+  List<Object> get props => [firstName, lastName, email, phone, password];
+}
+
+class ForgotPasswordSubmitted extends AuthEvent {
+  const ForgotPasswordSubmitted({required this.email});
+
+  final String email;
+
+  @override
+  List<Object> get props => [email];
 }
 
 class TogglePasswordVisibility extends AuthEvent {
@@ -58,4 +71,8 @@ class TogglePasswordVisibility extends AuthEvent {
 
 class AuthReset extends AuthEvent {
   const AuthReset();
+}
+
+class LogoutRequested extends AuthEvent {
+  const LogoutRequested();
 }

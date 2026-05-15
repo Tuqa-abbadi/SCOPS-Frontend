@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "SCOPS Dev",
+      "request": "launch",
+      "type": "dart",
+      "toolArgs": [
+        "--dart-define=API_BASE_URL=https://differ-villas-sheep-properties.trycloudflare.com/api/"
+      ]
+    }
+  ]
+}

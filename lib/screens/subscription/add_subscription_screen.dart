@@ -5,6 +5,7 @@ import '../../blocs/services/services_bloc.dart';
 import '../../blocs/subscription/subscription_bloc.dart';
 import '../../blocs/wallet/wallet_bloc.dart';
 import '../../core/app_design.dart';
+import '../feedback/feedback_screen.dart';
 
 class AddSubscriptionScreen extends StatefulWidget {
   const AddSubscriptionScreen({super.key, this.preSelectedService});
@@ -68,6 +69,11 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
   bool get _canSubmit => _svc != null && _plan != null && _cardId != null;
 
   void _submit() {
+    // Get count BEFORE adding so we can detect the 3rd sub
+    final currentCount = (context.read<SubscriptionBloc>().state is SubscriptionData)
+        ? (context.read<SubscriptionBloc>().state as SubscriptionData).subscriptions.length
+        : 0;
+
     context.read<SubscriptionBloc>().add(SubscriptionAdded(
           serviceName: _svc!.name,
           serviceIcon: _svc!.icon,
@@ -78,13 +84,168 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
           cardId: _cardId!,
           reminderDays: _remindDays,
         ));
+
     Navigator.pop(context);
+
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('${_svc!.name} added!'),
+      content: Text('\${_svc!.name} added!'),
       backgroundColor: D.cyan,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: D.r12),
     ));
+
+    // Show rating prompt after the 3rd subscription
+    if (currentCount + 1 == 3) {
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (context.mounted) _showRatingPrompt(context);
+      });
+    }
+  }
+
+  void _showRatingPrompt(BuildContext context) {
+    int _rating = 0;
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.75),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: const Color(0xFF07111C),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: const Color(0xFF18E8F2).withOpacity(0.20)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF18E8F2).withOpacity(0.10),
+                  blurRadius: 40,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Icon
+                Container(
+                  width: 64, height: 64,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF18E8F2).withOpacity(0.10),
+                    border: Border.all(color: const Color(0xFF18E8F2).withOpacity(0.25)),
+                  ),
+                  child: const Center(
+                    child: Text('🎉', style: TextStyle(fontSize: 30)),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  "You're on a roll!",
+                  style: TextStyle(
+                      color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "You just added your 3rd subscription.\nHow's SCOPS working for you?",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: Colors.white.withOpacity(0.50), fontSize: 13, height: 1.5),
+                ),
+                const SizedBox(height: 24),
+
+                // Stars
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (i) {
+                    final filled = i < _rating;
+                    return GestureDetector(
+                      onTap: () => setState(() => _rating = i + 1),
+                      child: AnimatedScale(
+                        scale: _rating == i + 1 ? 1.25 : 1.0,
+                        duration: const Duration(milliseconds: 150),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Icon(
+                            filled ? Icons.star_rounded : Icons.star_outline_rounded,
+                            color: filled ? const Color(0xFFFFB020) : Colors.white.withOpacity(0.25),
+                            size: 38,
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 24),
+
+                // Buttons
+                Row(
+                  children: [
+                    // Maybe later
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            side: BorderSide(color: Colors.white.withOpacity(0.10)),
+                          ),
+                        ),
+                        child: Text('Later',
+                            style: TextStyle(
+                                color: Colors.white.withOpacity(0.45),
+                                fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Submit / full feedback
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: _rating == 0
+                            ? null
+                            : () {
+                                Navigator.pop(ctx);
+                                // If 4+ stars just thank them, else open full feedback
+                                if (_rating >= 4) {
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                    content: const Text('Thanks for the love! ⭐'),
+                                    backgroundColor: const Color(0xFF18E8F2),
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12)),
+                                  ));
+                                } else {
+                                  // Open full feedback screen for negative ratings
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) => const FeedbackScreen()),
+                                  );
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF5A14),
+                          disabledBackgroundColor: const Color(0xFFFF5A14).withOpacity(0.30),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: const Text('Submit',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _label(String t) => Padding(

@@ -8,6 +8,8 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
   SubscriptionBloc() : super(const SubscriptionInitial()) {
     on<SubscriptionLoaded>(_onLoaded);
     on<SubscriptionAdded>(_onAdded);
+    on<SubscriptionUpdated>(_onUpdated);
+    on<SubscriptionCancelled>(_onCancelled);
     on<SubscriptionDeleted>(_onDeleted);
   }
 
@@ -29,6 +31,33 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
       reminderDays: event.reminderDays,
     );
     emit(SubscriptionData(subscriptions: [...current.subscriptions, sub]));
+  }
+
+  void _onUpdated(SubscriptionUpdated event, Emitter<SubscriptionState> emit) {
+    final current = state as SubscriptionData;
+    emit(SubscriptionData(
+      subscriptions: current.subscriptions.map((s) {
+        if (s.id != event.id) return s;
+        return s.copyWith(
+          plan: event.plan,
+          billingCycle: event.billingCycle,
+          amount: event.amount,
+          cardId: event.cardId,
+          reminderDays: event.reminderDays,
+          nextRenewal: event.nextRenewal,
+        );
+      }).toList(),
+    ));
+  }
+
+  void _onCancelled(SubscriptionCancelled event, Emitter<SubscriptionState> emit) {
+    final current = state as SubscriptionData;
+    emit(SubscriptionData(
+      subscriptions: current.subscriptions.map((s) {
+        if (s.id != event.id) return s;
+        return s.copyWith(status: SubscriptionStatus.cancelled);
+      }).toList(),
+    ));
   }
 
   void _onDeleted(SubscriptionDeleted event, Emitter<SubscriptionState> emit) {

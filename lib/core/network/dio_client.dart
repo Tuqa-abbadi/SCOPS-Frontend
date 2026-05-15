@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+
 import '../../services/token_storage_service.dart';
 import 'auth_interceptor.dart';
 
@@ -28,17 +29,7 @@ class DioClient {
 
     final client = DioClient._();
 
-    final dio = Dio(
-      BaseOptions(
-        baseUrl: baseUrl,
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 15),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      ),
-    );
+    final dio = Dio(_baseOptions(baseUrl));
 
     assert(() {
       dio.interceptors.add(
@@ -61,5 +52,19 @@ class DioClient {
 
     client._dio = dio;
     _instance = client;
+  }
+
+  static BaseOptions _baseOptions(String baseUrl) {
+    return BaseOptions(
+      baseUrl: baseUrl,
+      connectTimeout: const Duration(seconds: 60),
+      receiveTimeout: const Duration(seconds: 60),
+      sendTimeout: const Duration(seconds: 60),
+      headers: const {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+      },
+    );
   }
 }

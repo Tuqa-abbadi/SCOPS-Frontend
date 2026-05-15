@@ -1,10 +1,12 @@
-import 'dart:ui';
+﻿import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../blocs/auth/auth_bloc.dart';
-import 'signup_screen.dart';
+import '../../blocs/user/user_cubit.dart';
 import '../dashboard/dashboard_screen.dart';
+import 'forgot_password_screen.dart';
+import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -257,7 +259,14 @@ class _LoginScreenState extends State<LoginScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ForgotPasswordScreen(),
+                      ),
+                    );
+                  },
                   child: const Text(
                     'Forgot Password?',
                     style: TextStyle(
@@ -295,6 +304,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return BlocConsumer<LoginBloc, AuthState>(
       listener: (context, state) {
         if (state is LoginSuccess) {
+          context.read<UserCubit>().setUser(state.user);
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const DashboardScreen()),
@@ -374,7 +384,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            "Don’t have an account?",
+                            "Don't have an account?",
                             style: TextStyle(
                               color: Colors.white.withOpacity(0.42),
                               fontSize: 11,

@@ -21,6 +21,7 @@ class AppColors {
   static const textMuted = Color(0xFF7E969A);
 
   // Borders
+  static const border = borderCyan;
   static const borderCyan = Color(0x331DD8E8);
   static const borderOrange = Color(0x33FF5A14);
 

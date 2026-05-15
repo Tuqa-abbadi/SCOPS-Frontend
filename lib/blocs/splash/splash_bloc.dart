@@ -21,7 +21,7 @@ class SplashBloc extends Bloc<SplashEvent, SplashState> {
     await Future.delayed(const Duration(milliseconds: 200));
     emit(const SplashVisible());
 
-    final isLoggedIn = await _authRepository.isLoggedIn();
+    final isLoggedIn = await _authRepository.validateSession();
 
     await Future.delayed(const Duration(seconds: 3));
 

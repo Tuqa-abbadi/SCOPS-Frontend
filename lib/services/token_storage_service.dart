@@ -1,8 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import '../models/user_model.dart';
 
 class _Keys {
   static const accessToken = 'access_token';
   static const refreshToken = 'refresh_token';
+  static const userData = 'user_data';
 }
 
 class TokenStorageService {
@@ -45,10 +50,26 @@ class TokenStorageService {
     ]);
   }
 
+  Future<void> saveUser(UserModel user) =>
+      _storage.write(key: _Keys.userData, value: jsonEncode(user.toMap()));
+
+  Future<UserModel?> getUser() async {
+    final raw = await _storage.read(key: _Keys.userData);
+    if (raw == null) return null;
+    try {
+      return UserModel.fromMap(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> deleteUser() => _storage.delete(key: _Keys.userData);
+
   Future<void> clearAll() async {
     await Future.wait([
       deleteAccessToken(),
       deleteRefreshToken(),
+      deleteUser(),
     ]);
   }
 

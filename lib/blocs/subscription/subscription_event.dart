@@ -35,6 +35,36 @@ class SubscriptionAdded extends SubscriptionEvent {
   List<Object> get props => [serviceName, plan];
 }
 
+class SubscriptionUpdated extends SubscriptionEvent {
+  final String id;
+  final String plan;
+  final String billingCycle;
+  final double amount;
+  final String cardId;
+  final int reminderDays;
+  final DateTime nextRenewal;
+
+  const SubscriptionUpdated({
+    required this.id,
+    required this.plan,
+    required this.billingCycle,
+    required this.amount,
+    required this.cardId,
+    required this.reminderDays,
+    required this.nextRenewal,
+  });
+
+  @override
+  List<Object> get props => [id];
+}
+
+class SubscriptionCancelled extends SubscriptionEvent {
+  final String id;
+  const SubscriptionCancelled(this.id);
+  @override
+  List<Object> get props => [id];
+}
+
 class SubscriptionDeleted extends SubscriptionEvent {
   final String id;
   const SubscriptionDeleted(this.id);
