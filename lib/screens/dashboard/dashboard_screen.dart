@@ -21,9 +21,13 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen>
     with TickerProviderStateMixin {
   int _currentIndex = 0;
+  int _navFromIndex = 0;
+  int _navToIndex = 0;
   bool _isOpeningAdd = false;
   late AnimationController _chartCtrl;
   late Animation<double> _chartAnim;
+  late AnimationController _navCtrl;
+  late Animation<double> _navAnim;
 
   static const _bg            = Color(0xFF0D0F12);
   static const _cyan          = Color(0xFF1DD8E8);
@@ -32,6 +36,14 @@ class _DashboardScreenState extends State<DashboardScreen>
   static const _textPrimary   = Color(0xFFFFFFFF);
   static const _textSecondary = Color(0xFF8A9BA8);
   static const _cardBg        = Color(0xFF141820);
+
+  static const _navItems = [
+    _NavDestination(Icons.home_rounded, Icons.home_outlined, 'Home', 0),
+    _NavDestination(Icons.grid_view_rounded, Icons.grid_view_outlined, 'Services', 1),
+    _NavDestination(Icons.account_balance_wallet_rounded,
+        Icons.account_balance_wallet_outlined, 'Wallet', 3),
+    _NavDestination(Icons.person_rounded, Icons.person_outline_rounded, 'Profile', 4),
+  ];
 
   static const _catColors = <String, Color>{
     'Streaming': Color(0xFF1DD8E8),
@@ -113,12 +125,16 @@ class _DashboardScreenState extends State<DashboardScreen>
     super.initState();
     _chartCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000));
     _chartAnim = CurvedAnimation(parent: _chartCtrl, curve: Curves.easeOutCubic);
+    _navCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 680));
+    _navAnim = CurvedAnimation(parent: _navCtrl, curve: Curves.easeInOutCubic);
     _chartCtrl.forward();
+    _navCtrl.value = 1;
   }
 
   @override
   void dispose() {
     _chartCtrl.dispose();
+    _navCtrl.dispose();
     super.dispose();
   }
 
@@ -152,6 +168,16 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  void _selectNavIndex(int index) {
+    if (_currentIndex == index) return;
+    setState(() {
+      _navFromIndex = _currentIndex;
+      _navToIndex = index;
+      _currentIndex = index;
+    });
+    _navCtrl.forward(from: 0);
+  }
+
   // ── Widgets ───────────────────────────────────────────────────────────────
   Widget _iconBtn(IconData icon, {VoidCallback? onTap}) => GestureDetector(
     onTap: onTap,
@@ -160,7 +186,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       decoration: BoxDecoration(
         color: const Color(0xFF181E26),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.08))),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08))),
       child: Icon(icon, color: _textPrimary, size: 22)));
 
   Widget _summaryCard({required String value, required String label,
@@ -170,17 +196,17 @@ class _DashboardScreenState extends State<DashboardScreen>
         decoration: BoxDecoration(
           color: const Color(0xFF080C10),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: glowColor.withOpacity(0.28), width: 1.2))),
+          border: Border.all(color: glowColor.withValues(alpha: 0.28), width: 1.2))),
       Positioned.fill(child: ClipRRect(borderRadius: BorderRadius.circular(24),
         child: Container(decoration: BoxDecoration(gradient: RadialGradient(
           center: const Alignment(1.0, -1.0), radius: 1.4,
-          colors: [glowColor.withOpacity(0.30), glowColor.withOpacity(0.10), Colors.transparent],
+          colors: [glowColor.withValues(alpha: 0.30), glowColor.withValues(alpha: 0.10), Colors.transparent],
           stops: const [0.0, 0.35, 0.75]))))),
       Positioned.fill(child: Padding(
         padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(width: 36, height: 36,
-            decoration: BoxDecoration(color: glowColor.withOpacity(0.15), borderRadius: BorderRadius.circular(11)),
+            decoration: BoxDecoration(color: glowColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(11)),
             child: Icon(icon, color: iconColor, size: 20)),
           const Spacer(),
           Text(value, style: const TextStyle(color: _textPrimary, fontSize: 24, fontWeight: FontWeight.w900)),
@@ -199,8 +225,8 @@ class _DashboardScreenState extends State<DashboardScreen>
         colors: [_cyan, _orangeLight, _orange], stops: [0.0, 0.55, 1.0],
         begin: Alignment.centerLeft, end: Alignment.centerRight),
       boxShadow: [
-        BoxShadow(color: _cyan.withOpacity(0.20), blurRadius: 25, offset: const Offset(-5, 8)),
-        BoxShadow(color: _orange.withOpacity(0.22), blurRadius: 25, offset: const Offset(5, 8))]),
+        BoxShadow(color: _cyan.withValues(alpha: 0.20), blurRadius: 25, offset: const Offset(-5, 8)),
+        BoxShadow(color: _orange.withValues(alpha: 0.22), blurRadius: 25, offset: const Offset(5, 8))]),
     child: Row(children: [
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Active Subscriptions',
@@ -213,7 +239,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             style: TextStyle(color: Color(0xFF0D1A1C), fontWeight: FontWeight.w700, fontSize: 12)),
       ])),
       Container(width: 60, height: 60,
-        decoration: BoxDecoration(color: Colors.black.withOpacity(0.15), borderRadius: BorderRadius.circular(20)),
+        decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
         child: const Icon(Icons.subscriptions_rounded, color: Color(0xFF0D1A1C), size: 28)),
     ]));
 
@@ -228,10 +254,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       decoration: BoxDecoration(
         color: _cardBg,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.22),
+            color: Colors.black.withValues(alpha: 0.22),
             blurRadius: 26,
             offset: const Offset(0, 16),
           ),
@@ -245,8 +271,8 @@ class _DashboardScreenState extends State<DashboardScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: _cyan.withOpacity(0.10), borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _cyan.withOpacity(0.20))),
+              color: _cyan.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _cyan.withValues(alpha: 0.20))),
             child: const Text('This month',
                 style: TextStyle(color: _cyan, fontSize: 10, fontWeight: FontWeight.w700))),
         ]),
@@ -269,7 +295,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             if (topCategory != null) ...[
               Text('Top category',
                   style: TextStyle(
-                    color: _textSecondary.withOpacity(0.8),
+                    color: _textSecondary.withValues(alpha: 0.8),
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                   )),
@@ -301,9 +327,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                       width: 24,
                       height: 24,
                       decoration: BoxDecoration(
-                        color: color.withOpacity(0.12),
+                        color: color.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: color.withOpacity(0.22)),
+                        border: Border.all(color: color.withValues(alpha: 0.22)),
                       ),
                       child: Icon(
                         _catIcons[item.name] ?? Icons.category_rounded,
@@ -328,7 +354,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     const SizedBox(width: 6),
                     Text('${(pct * 100).toStringAsFixed(0)}%',
                         style: TextStyle(
-                          color: _textSecondary.withOpacity(0.58),
+                          color: _textSecondary.withValues(alpha: 0.58),
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                         )),
@@ -339,7 +365,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     child: LinearProgressIndicator(
                       minHeight: 3,
                       value: pct,
-                      backgroundColor: Colors.white.withOpacity(0.06),
+                      backgroundColor: Colors.white.withValues(alpha: 0.06),
                       valueColor: AlwaysStoppedAnimation<Color>(color),
                     ),
                   ),
@@ -353,8 +379,12 @@ class _DashboardScreenState extends State<DashboardScreen>
   // ── Renewal tile ───────────────────────────────────────────────────────────
   Widget _renewalTile(SubscriptionModel s) {
     final daysLeft    = s.nextRenewal.difference(DateTime.now()).inDays;
-    final isUrgent    = daysLeft <= 3;
-    final isCancelled = !s.isActive;
+    final isUrgent    = daysLeft <= 3 && s.isActive;
+    final isCancelled = s.isCancelled;
+    final isPaused    = s.isPaused;
+    final isInactive  = isCancelled || isPaused;
+
+    final badgeColor = isCancelled ? _orange : const Color(0xFFF59E0B);
 
     return GestureDetector(
       onTap: () => _openSubDetail(s),
@@ -364,47 +394,49 @@ class _DashboardScreenState extends State<DashboardScreen>
         decoration: BoxDecoration(
           color: _cardBg, borderRadius: BorderRadius.circular(20),
           border: Border.all(
-              color: isCancelled ? _orange.withOpacity(0.18) : Colors.white.withOpacity(0.06))),
+              color: isInactive ? badgeColor.withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.06))),
         child: Row(children: [
           Stack(clipBehavior: Clip.none, children: [
             Container(width: 44, height: 44,
               decoration: BoxDecoration(
-                color: isCancelled ? _orange.withOpacity(0.08) : const Color(0xFF1E2730),
+                color: isInactive ? badgeColor.withValues(alpha: 0.08) : const Color(0xFF1E2730),
                 borderRadius: BorderRadius.circular(14)),
               child: Center(child: Text(s.serviceIcon, style: const TextStyle(fontSize: 22)))),
-            if (isCancelled)
+            if (isInactive)
               Positioned(top: -4, right: -4,
                 child: Container(width: 16, height: 16,
-                  decoration: const BoxDecoration(shape: BoxShape.circle, color: _orange),
-                  child: const Icon(Icons.close, color: Colors.white, size: 10))),
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: badgeColor),
+                  child: Icon(
+                    isCancelled ? Icons.close : Icons.pause,
+                    color: Colors.white, size: 9))),
           ]),
           const SizedBox(width: 14),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Flexible(child: Text(s.serviceName, style: TextStyle(
-                color: isCancelled ? _textSecondary : _textPrimary,
+                color: isInactive ? _textSecondary : _textPrimary,
                 fontWeight: FontWeight.w700, fontSize: 14,
                 decoration: isCancelled ? TextDecoration.lineThrough : null))),
-              if (isCancelled) ...[
+              if (isInactive) ...[
                 const SizedBox(width: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: _orange.withOpacity(0.12), borderRadius: BorderRadius.circular(6)),
-                  child: const Text('Cancelled',
-                      style: TextStyle(color: _orange, fontSize: 9, fontWeight: FontWeight.w800))),
+                    color: badgeColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+                  child: Text(isCancelled ? 'Cancelled' : 'Paused',
+                      style: TextStyle(color: badgeColor, fontSize: 9, fontWeight: FontWeight.w800))),
               ],
             ]),
             const SizedBox(height: 3),
-            Text(isCancelled ? s.plan : DateFormat('MMM d').format(s.nextRenewal),
+            Text(isInactive ? s.plan : DateFormat('MMM d').format(s.nextRenewal),
                 style: const TextStyle(color: _textSecondary, fontSize: 12)),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Text('\$${s.amount.toStringAsFixed(2)}', style: TextStyle(
-                color: isCancelled ? _textSecondary : _textPrimary,
+                color: isInactive ? _textSecondary : _textPrimary,
                 fontWeight: FontWeight.w800, fontSize: 14)),
             const SizedBox(height: 3),
-            if (!isCancelled) Text(
+            if (s.isActive) Text(
               isUrgent ? '$daysLeft days left' : 'in $daysLeft days',
               style: TextStyle(
                   color: isUrgent ? _orange : _textSecondary,
@@ -417,8 +449,50 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   // ── Home tab ───────────────────────────────────────────────────────────────
   Widget _homeTab() {
-    return BlocBuilder<SubscriptionBloc, SubscriptionState>(
+    return BlocConsumer<SubscriptionBloc, SubscriptionState>(
+      listener: (context, subState) {
+        if (subState is SubscriptionData && subState.actionError != null) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(subState.actionError!),
+            backgroundColor: _orange,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ));
+        }
+      },
       builder: (context, subState) {
+        // Full-page loading
+        if (subState is SubscriptionsLoading) {
+          return const Center(child: CircularProgressIndicator(color: _cyan));
+        }
+
+        // Full-page error with retry
+        if (subState is SubscriptionError) {
+          return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.wifi_off_rounded, color: _textSecondary, size: 48),
+            const SizedBox(height: 16),
+            Text(subState.message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: _textSecondary, fontSize: 14)),
+            const SizedBox(height: 20),
+            GestureDetector(
+              onTap: () => context.read<SubscriptionBloc>().add(const SubscriptionsRefreshRequested()),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: _cyan.withValues(alpha: 0.65)),
+                ),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.refresh_rounded, color: _cyan, size: 18),
+                  SizedBox(width: 8),
+                  Text('Retry', style: TextStyle(color: _cyan, fontWeight: FontWeight.w700)),
+                ]),
+              ),
+            ),
+          ]));
+        }
+
         final allSubs    = subState is SubscriptionData ? subState.subscriptions : <SubscriptionModel>[];
         final activeSubs = allSubs.where((s) => s.isActive).toList();
         final totalSpend = activeSubs.fold(0.0, (sum, s) => sum + s.amount);
@@ -474,8 +548,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                 padding: const EdgeInsets.symmetric(vertical: 36),
                 decoration: BoxDecoration(
                   color: _cardBg, borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: _cyan.withOpacity(0.35)),
-                  boxShadow: [BoxShadow(color: _cyan.withOpacity(0.08), blurRadius: 24, offset: const Offset(0, 10))]),
+                  border: Border.all(color: _cyan.withValues(alpha: 0.35)),
+                  boxShadow: [BoxShadow(color: _cyan.withValues(alpha: 0.08), blurRadius: 24, offset: const Offset(0, 10))]),
                 child: const Column(children: [
                   Icon(Icons.calendar_today_rounded, color: _textSecondary, size: 36),
                   SizedBox(height: 12),
@@ -491,59 +565,165 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   // ── Bottom nav ─────────────────────────────────────────────────────────────
   Widget _bottomNav() {
-    return SizedBox(
-      height: 78,
-      child: Stack(clipBehavior: Clip.none, children: [
-        Positioned(left: 0, right: 0, bottom: 0,
-          child: CustomPaint(
-            painter: _BottomNavNotchPainter(),
-            child: const SizedBox(height: 68))),
-        Positioned(left: 0, bottom: 0,
-          child: SizedBox(
-            width: MediaQuery.of(context).size.width / 2 - 44, height: 68,
-            child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-              _navItem(Icons.home_outlined, 'Home', 0),
-              _navItem(Icons.grid_view_rounded, 'Services', 1),
-            ]))),
-        Positioned(right: 0, bottom: 0,
-          child: SizedBox(
-            width: MediaQuery.of(context).size.width / 2 - 44, height: 68,
-            child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-              _navItem(Icons.account_balance_wallet_outlined, 'Wallet', 3),
-              _navItem(Icons.person_outline_rounded, 'Profile', 4),
-            ]))),
-        Positioned(
-          top: 0,
-          left: MediaQuery.of(context).size.width / 2 - 33,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: _openAddSubscription,
-            child: Container(
-              width: 66, height: 66,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFF7A1F), Color(0xFFFF4B09)],
-                  begin: Alignment.topLeft, end: Alignment.bottomRight),
-                boxShadow: [BoxShadow(
-                    color: _orange.withOpacity(0.45), blurRadius: 22, spreadRadius: 1)]),
-              child: const Icon(Icons.add, color: Colors.white, size: 38)))),
-      ]));
+    final activeSlot = _navItems.indexWhere((item) => item.index == _currentIndex);
+    final safeSlot = activeSlot < 0 ? 0 : activeSlot;
+    final activeItem = _navItems[safeSlot];
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+        child: SizedBox(
+          height: 86,
+          child: LayoutBuilder(builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            final slotWidth = width / _navItems.length;
+
+            double centerForIndex(int index) {
+              final slot = _navItems.indexWhere((item) => item.index == index);
+              final safe = slot < 0 ? 0 : slot;
+              return (slotWidth * safe) + (slotWidth / 2);
+            }
+
+            return AnimatedBuilder(
+              animation: _navAnim,
+              builder: (context, _) {
+                final t = _navAnim.value;
+                final fromCenter = centerForIndex(_navFromIndex);
+                final toCenter = centerForIndex(_navToIndex);
+                final circleCenter = ui.lerpDouble(fromCenter, toCenter, t)!;
+                final circleTop = 10 + (math.sin(t * math.pi) * 8);
+
+                return Stack(clipBehavior: Clip.none, children: [
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 4,
+                    height: 72,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(30),
+                        color: const Color(0xFF08111C).withValues(alpha: 0.96),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.38),
+                            blurRadius: 28,
+                            offset: const Offset(0, 14),
+                          ),
+                          BoxShadow(
+                            color: _cyan.withValues(alpha: 0.07),
+                            blurRadius: 18,
+                            offset: const Offset(0, -2),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 4,
+                    height: 72,
+                    child: Row(
+                      children: _navItems
+                          .map((item) => Expanded(child: _navItem(item)))
+                          .toList(),
+                    ),
+                  ),
+                  Positioned(
+                    left: circleCenter - 20,
+                    top: circleTop,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => _selectNavIndex(activeItem.index),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [_orangeLight, _orange],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _orange.withValues(alpha: 0.32),
+                              blurRadius: 18,
+                              spreadRadius: 1,
+                              offset: const Offset(0, 8),
+                            ),
+                            BoxShadow(
+                              color: const Color(0xFF08111C).withValues(alpha: 0.90),
+                              blurRadius: 10,
+                              spreadRadius: -6,
+                              offset: const Offset(0, 9),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          activeItem.activeIcon,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                    ),
+                  ),
+                ]);
+              },
+            );
+          }),
+        ),
+      ),
+    );
   }
 
-  Widget _navItem(IconData icon, String label, int index) {
-    final isActive = _currentIndex == index;
+  Widget _navItem(_NavDestination item) {
+    final isActive = _currentIndex == item.index;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: _isOpeningAdd ? null : () => setState(() => _currentIndex = index),
-      child: SizedBox(width: 68,
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, size: 27, color: isActive ? _cyan : const Color(0xFF9BA4B0)),
-          const SizedBox(height: 5),
-          Text(label, style: TextStyle(
-            color: isActive ? _cyan : const Color(0xFF9BA4B0),
-            fontSize: 13, fontWeight: isActive ? FontWeight.w800 : FontWeight.w600)),
-        ])));
+      onTap: () => _selectNavIndex(item.index),
+      child: SizedBox.expand(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                height: 40,
+                child: Center(
+                  child: AnimatedOpacity(
+                    opacity: isActive ? 0.0 : 1.0,
+                    duration: const Duration(milliseconds: 180),
+                    child: Icon(
+                      item.icon,
+                      size: 23,
+                      color: const Color(0xFF9BA4B0),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 2),
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 180),
+                style: TextStyle(
+                  color: isActive ? _orangeLight : const Color(0xFF9BA4B0),
+                  fontSize: 10.5,
+                  height: 1.0,
+                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                ),
+                child: Text(
+                  item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _currentPage() {
@@ -582,6 +762,15 @@ class _CategorySpend {
   final String name;
   final double amount;
   final int count;
+}
+
+class _NavDestination {
+  const _NavDestination(this.activeIcon, this.icon, this.label, this.index);
+
+  final IconData activeIcon;
+  final IconData icon;
+  final String label;
+  final int index;
 }
 
 // ── Donut chart painter ───────────────────────────────────────────────────
@@ -642,21 +831,48 @@ class _DonutPainter extends CustomPainter {
 }
 
 // ── Bottom nav painter ────────────────────────────────────────────────────
-class _BottomNavNotchPainter extends CustomPainter {
+class _BottomNavWavePainter extends CustomPainter {
+  const _BottomNavWavePainter({required this.circleCenter});
+
+  final double circleCenter;
+
   @override
   void paint(Canvas canvas, Size size) {
-    final fill   = Paint()..color = const Color(0xFF08111C).withOpacity(0.92)..style = PaintingStyle.fill;
-    final border = Paint()..color = Colors.white.withOpacity(0.07)..style = PaintingStyle.stroke..strokeWidth = 1;
-    final path   = Path();
-    final cx     = size.width / 2;
-    const corner = 24.0;
+    final fill = Paint()
+      ..color = const Color(0xFF08111C).withValues(alpha: 0.96)
+      ..style = PaintingStyle.fill;
+    final border = Paint()
+      ..color = Colors.white.withValues(alpha: 0.07)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final glow = Paint()
+      ..color = const Color(0xFFFF5A14).withValues(alpha: 0.10)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16);
+
+    final path = Path();
+    final cx = circleCenter.clamp(48.0, size.width - 48.0);
+    const corner = 28.0;
+    const waveWidth = 92.0;
+    const waveDepth = 20.0;
 
     path.moveTo(corner, 0);
-    path.lineTo(cx - 58, 0);
-    path.cubicTo(cx - 50, 0, cx - 48, 20, cx - 38, 34);
-    path.cubicTo(cx - 28, 52, cx - 18, 64, cx,      64);
-    path.cubicTo(cx + 18, 64, cx + 28, 52, cx + 38, 34);
-    path.cubicTo(cx + 48, 20, cx + 50, 0,  cx + 58,  0);
+    path.lineTo(cx - waveWidth / 2, 0);
+    path.cubicTo(
+      cx - 34,
+      0,
+      cx - 32,
+      waveDepth,
+      cx,
+      waveDepth,
+    );
+    path.cubicTo(
+      cx + 32,
+      waveDepth,
+      cx + 34,
+      0,
+      cx + waveWidth / 2,
+      0,
+    );
     path.lineTo(size.width - corner, 0);
     path.quadraticBezierTo(size.width, 0, size.width, corner);
     path.lineTo(size.width, size.height - corner);
@@ -667,10 +883,12 @@ class _BottomNavNotchPainter extends CustomPainter {
     path.quadraticBezierTo(0, 0, corner, 0);
     path.close();
 
+    canvas.drawPath(path.shift(const Offset(0, 2)), glow);
     canvas.drawPath(path, fill);
     canvas.drawPath(path, border);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _BottomNavWavePainter oldDelegate) =>
+      oldDelegate.circleCenter != circleCenter;
 }

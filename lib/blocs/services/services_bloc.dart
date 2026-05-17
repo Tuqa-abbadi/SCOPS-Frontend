@@ -1,70 +1,437 @@
+import 'package:dio/dio.dart';
+import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:equatable/equatable.dart';
+
+import '../../core/network/dio_client.dart';
+import '../../models/category_model.dart';
+import '../../models/service_plan_model.dart';
+import '../../services/categories_api_service.dart';
+import '../../services/services_api_service.dart';
+
+export '../../models/category_model.dart';
+export '../../models/service_plan_model.dart';
 
 part 'services_event.dart';
 part 'services_state.dart';
 
-final _mockServices = [
-  const ServiceModel(id: '1', name: 'Netflix', category: 'Entertainment', icon: '🎬', description: 'Stream movies, TV shows, and more on any device.', plans: ['Basic', 'Standard', 'Premium'], startingPrice: 6.99, color: Color(0xFFE50914)),
-  const ServiceModel(id: '2', name: 'Spotify', category: 'Music', icon: '🎵', description: 'Music streaming with millions of songs and podcasts.', plans: ['Free', 'Individual', 'Duo', 'Family'], startingPrice: 9.99, color: Color(0xFF1DB954)),
-  const ServiceModel(id: '3', name: 'Adobe CC', category: 'Productivity', icon: '🎨', description: 'Creative cloud suite: Photoshop, Illustrator, Premiere & more.', plans: ['Photography', 'All Apps', 'Single App'], startingPrice: 9.99, color: Color(0xFFFF0000)),
-  const ServiceModel(id: '4', name: 'YouTube Premium', category: 'Entertainment', icon: '📺', description: 'Ad-free YouTube with background play and downloads.', plans: ['Individual', 'Family', 'Student'], startingPrice: 13.99, color: Color(0xFFFF0000)),
-  const ServiceModel(id: '5', name: 'iCloud+', category: 'Cloud Storage', icon: '☁️', description: 'Apple cloud storage with advanced privacy features.', plans: ['50GB', '200GB', '2TB'], startingPrice: 0.99, color: Color(0xFF0071E3)),
-  const ServiceModel(id: '6', name: 'Google One', category: 'Cloud Storage', icon: '🔵', description: 'Google storage across Drive, Gmail, and Photos.', plans: ['Basic', 'Standard', 'Premium'], startingPrice: 1.99, color: Color(0xFF4285F4)),
-  const ServiceModel(id: '7', name: 'Microsoft 365', category: 'Productivity', icon: '💼', description: 'Word, Excel, PowerPoint and 1TB of OneDrive storage.', plans: ['Personal', 'Family', 'Business'], startingPrice: 6.99, color: Color(0xFF0078D4)),
-  const ServiceModel(id: '8', name: 'Apple Music', category: 'Music', icon: '🎶', description: 'Over 100 million songs with lossless audio.', plans: ['Individual', 'Student', 'Family'], startingPrice: 10.99, color: Color(0xFFFC3C44)),
-  const ServiceModel(id: '9', name: 'Disney+', category: 'Entertainment', icon: '✨', description: 'Disney, Marvel, Star Wars, Pixar and National Geographic.', plans: ['Basic', 'Premium'], startingPrice: 7.99, color: Color(0xFF113CCF)),
-  const ServiceModel(id: '10', name: 'GitHub', category: 'Developer', icon: '💻', description: 'Code hosting, CI/CD, and collaboration for developers.', plans: ['Free', 'Team', 'Enterprise'], startingPrice: 4.00, color: Color(0xFF6E40C9)),
-  const ServiceModel(id: '11', name: 'Notion', category: 'Productivity', icon: '📝', description: 'All-in-one workspace for notes, tasks, and databases.', plans: ['Free', 'Plus', 'Business'], startingPrice: 10.00, color: Color(0xFF9AB0B4)),
-  const ServiceModel(id: '12', name: 'Figma', category: 'Developer', icon: '🖌️', description: 'Collaborative design and prototyping tool for teams.', plans: ['Starter', 'Professional', 'Organization'], startingPrice: 12.00, color: Color(0xFFF24E1E)),
-];
+// ignore: avoid_print
+void _log(String msg) => print('[ServicesBloc] $msg');
 
 class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
-  ServicesBloc() : super(const ServicesInitial()) {
+  ServicesBloc({
+    ServicesApiService? servicesService,
+    CategoriesApiService? categoriesService,
+  })  : _servicesService =
+            servicesService ?? ServicesApiService(dio: DioClient.instance.dio),
+        _categoriesService =
+            categoriesService ??
+                CategoriesApiService(dio: DioClient.instance.dio),
+        super(const ServicesInitial()) {
     on<ServicesLoaded>(_onLoaded);
-    on<ServicesCategoryChanged>(_onCategoryChanged);
+    on<ServicesCategorySelected>(_onCategorySelected);
     on<ServicesSearchChanged>(_onSearchChanged);
+    on<ServiceDetailRequested>(_onServiceDetailRequested);
+    on<ServicePlanSelected>(_onPlanSelected);
   }
 
-  Future<void> _onLoaded(ServicesLoaded event, Emitter<ServicesState> emit) async {
+  final ServicesApiService _servicesService;
+  final CategoriesApiService _categoriesService;
+
+  // ── Initial load: categories + services in parallel ───────────────────────
+  Future<void> _onLoaded(
+    ServicesLoaded event,
+    Emitter<ServicesState> emit,
+  ) async {
     emit(const ServicesLoading());
-    await Future.delayed(const Duration(milliseconds: 300));
+
+    List<CategoryModel> categories = [];
+    String? categoriesError;
+    List<dynamic> rawServices = [];
+    String? servicesError;
+
+    await Future.wait([
+      _categoriesService.getCategories().then((r) {
+        categories = _parseCategories(r.data);
+        _log('Loaded ${categories.length} categories');
+      }).catchError((Object e) {
+        _log('Categories error: $e');
+        categoriesError = _errorMessage(e);
+      }),
+
+      _servicesService.getServices().then((r) {
+        rawServices = _extractList(r.data);
+        _log('Loaded ${rawServices.length} raw services');
+      }).catchError((Object e) {
+        _log('Services error: $e');
+        servicesError = _errorMessage(e);
+      }),
+    ]);
+
+    List<ServiceModel> services = [];
+    try {
+      services = _parseServices(rawServices, categories);
+      _log('Parsed ${services.length} services');
+    } catch (e, st) {
+      _log('_parseServices threw: $e\n$st');
+      servicesError ??= 'Failed to parse services response.';
+    }
+
     emit(ServicesDataLoaded(
-      allServices: _mockServices,
-      filteredServices: _mockServices,
-      selectedCategory: 'All',
+      categories: categories,
+      categoriesError: categoriesError,
+      services: services,
+      filteredServices: services,
+      selectedCategoryId: null,
       searchQuery: '',
+      servicesLoading: false,
+      servicesError: servicesError,
     ));
   }
 
-  void _onCategoryChanged(ServicesCategoryChanged event, Emitter<ServicesState> emit) {
-    final current = state as ServicesDataLoaded;
+  // ── Category selected: re-fetch services server-side ─────────────────────
+  Future<void> _onCategorySelected(
+    ServicesCategorySelected event,
+    Emitter<ServicesState> emit,
+  ) async {
+    final current = state;
+    if (current is! ServicesDataLoaded) return;
+
     emit(ServicesDataLoaded(
-      allServices: current.allServices,
-      filteredServices: _filter(current.allServices, event.category, current.searchQuery),
-      selectedCategory: event.category,
+      categories: current.categories,
+      categoriesError: current.categoriesError,
+      services: const [],
+      filteredServices: const [],
+      selectedCategoryId: event.categoryId,
       searchQuery: current.searchQuery,
+      servicesLoading: true,
+      servicesError: null,
+      detailServiceId: current.detailServiceId,
+      detailLoading: current.detailLoading,
+      detailError: current.detailError,
+      detailPlans: current.detailPlans,
+      selectedPlanId: current.selectedPlanId,
     ));
+
+    try {
+      final response = event.categoryId == null
+          ? await _servicesService.getServices()
+          : await _servicesService.getServicesByCategory(event.categoryId!);
+
+      final raw = _extractList(response.data);
+      final services = _parseServices(raw, current.categories);
+      final filtered = _applySearch(services, current.searchQuery);
+
+      emit(ServicesDataLoaded(
+        categories: current.categories,
+        categoriesError: current.categoriesError,
+        services: services,
+        filteredServices: filtered,
+        selectedCategoryId: event.categoryId,
+        searchQuery: current.searchQuery,
+        servicesLoading: false,
+        servicesError: null,
+        detailServiceId: current.detailServiceId,
+        detailLoading: current.detailLoading,
+        detailError: current.detailError,
+        detailPlans: current.detailPlans,
+        selectedPlanId: current.selectedPlanId,
+      ));
+    } on DioException catch (e) {
+      emit(ServicesDataLoaded(
+        categories: current.categories,
+        categoriesError: current.categoriesError,
+        services: const [],
+        filteredServices: const [],
+        selectedCategoryId: event.categoryId,
+        searchQuery: current.searchQuery,
+        servicesLoading: false,
+        servicesError: _dioError(e),
+        detailServiceId: current.detailServiceId,
+        detailLoading: current.detailLoading,
+        detailError: current.detailError,
+        detailPlans: current.detailPlans,
+        selectedPlanId: current.selectedPlanId,
+      ));
+    } catch (e) {
+      _log('_onCategorySelected unhandled: $e');
+      emit(ServicesDataLoaded(
+        categories: current.categories,
+        categoriesError: current.categoriesError,
+        services: const [],
+        filteredServices: const [],
+        selectedCategoryId: event.categoryId,
+        searchQuery: current.searchQuery,
+        servicesLoading: false,
+        servicesError: 'Something went wrong. Please try again.',
+        detailServiceId: current.detailServiceId,
+        detailLoading: current.detailLoading,
+        detailError: current.detailError,
+        detailPlans: current.detailPlans,
+        selectedPlanId: current.selectedPlanId,
+      ));
+    }
   }
 
-  void _onSearchChanged(ServicesSearchChanged event, Emitter<ServicesState> emit) {
-    final current = state as ServicesDataLoaded;
+  // ── Search: client-side filter ────────────────────────────────────────────
+  void _onSearchChanged(
+    ServicesSearchChanged event,
+    Emitter<ServicesState> emit,
+  ) {
+    final current = state;
+    if (current is! ServicesDataLoaded || current.servicesLoading) return;
+
     emit(ServicesDataLoaded(
-      allServices: current.allServices,
-      filteredServices: _filter(current.allServices, current.selectedCategory, event.query),
-      selectedCategory: current.selectedCategory,
+      categories: current.categories,
+      categoriesError: current.categoriesError,
+      services: current.services,
+      filteredServices: _applySearch(current.services, event.query),
+      selectedCategoryId: current.selectedCategoryId,
       searchQuery: event.query,
+      servicesLoading: false,
+      servicesError: current.servicesError,
+      detailServiceId: current.detailServiceId,
+      detailLoading: current.detailLoading,
+      detailError: current.detailError,
+      detailPlans: current.detailPlans,
+      selectedPlanId: current.selectedPlanId,
     ));
   }
 
-  List<ServiceModel> _filter(List<ServiceModel> all, String category, String query) {
-    return all.where((s) {
-      final matchesCategory = category == 'All' || s.category == category;
-      final matchesQuery = query.isEmpty ||
-          s.name.toLowerCase().contains(query.toLowerCase()) ||
-          s.category.toLowerCase().contains(query.toLowerCase());
-      return matchesCategory && matchesQuery;
-    }).toList();
+  // ── Service detail ────────────────────────────────────────────────────────
+  //
+  // Confirmed response shape from GET /api/services/{id}:
+  //   { "success": true, "message": "...", "data": { ...service fields... } }
+  //
+  // TODO(backend): plans are not yet included in this response.
+  //   To enable plan selection, add a "plans" array inside "data":
+  //   "data": {
+  //     "id": 3, "name": "Spotify", ...,
+  //     "plans": [
+  //       { "id": 1, "service_id": 3, "plan_name": "Individual",
+  //         "billing_cycle": "monthly", "price": "9.99", "features": "..." },
+  //       ...
+  //     ]
+  //   }
+  Future<void> _onServiceDetailRequested(
+    ServiceDetailRequested event,
+    Emitter<ServicesState> emit,
+  ) async {
+    if (state is! ServicesDataLoaded) return;
+
+    final id = int.tryParse(event.serviceId);
+    if (id == null) {
+      _emitDetailResult(emit, event.serviceId, const [], 'Invalid service ID.');
+      return;
+    }
+
+    _emitDetailLoading(emit, event.serviceId);
+
+    var plans = const <ServicePlan>[];
+    String? detailError;
+
+    try {
+      final response = await _servicesService.getServiceById(id);
+      _log('ServiceDetail id=$id  status=${response.statusCode}');
+
+      plans = _parsePlansFromDetail(response.data);
+      _log('ServiceDetail id=$id  plans=${plans.length}');
+    } on DioException catch (e) {
+      _log('ServiceDetail DioException: ${_dioError(e)}');
+      detailError = _dioError(e);
+    } catch (e) {
+      _log('ServiceDetail error: $e');
+      detailError = 'Failed to load service details.';
+    }
+
+    _emitDetailResult(emit, event.serviceId, plans, detailError);
+  }
+
+  void _emitDetailLoading(Emitter<ServicesState> emit, String serviceId) {
+    final s = state;
+    if (s is! ServicesDataLoaded) return;
+    emit(s.copyWith(
+      detailServiceId: serviceId,
+      detailLoading: true,
+      detailError: null,
+      detailPlans: const [],
+      selectedPlanId: null,
+    ));
+  }
+
+  void _emitDetailResult(
+    Emitter<ServicesState> emit,
+    String serviceId,
+    List<ServicePlan> plans,
+    String? error,
+  ) {
+    final s = state;
+    if (s is! ServicesDataLoaded) return;
+    emit(s.copyWith(
+      detailServiceId: serviceId,
+      detailLoading: false,
+      detailError: error,
+      detailPlans: plans,
+    ));
+  }
+
+  // ── Plan selection ────────────────────────────────────────────────────────
+  Future<void> _onPlanSelected(
+    ServicePlanSelected event,
+    Emitter<ServicesState> emit,
+  ) async {
+    final current = state;
+    if (current is! ServicesDataLoaded) return;
+    emit(current.copyWith(selectedPlanId: event.planId));
+  }
+
+  // ── Plan parsing ──────────────────────────────────────────────────────────
+
+  // Backend DB has service_plans rows, but GET /api/services/{id} does not
+  // yet include them in its response.
+  // Required backend fix: add "plans" inside the "data" object:
+  //   "data": { "id": 3, ..., "plans": [
+  //     { "id": 1, "service_id": 3, "plan_name": "Individual",
+  //       "billing_cycle": "monthly", "price": "9.99", "features": "..." }
+  //   ]}
+  List<ServicePlan> _parsePlansFromDetail(dynamic body) {
+    if (body is! Map) return [];
+    final top = _toStringMap(body);
+
+    // Unwrap { "success": true, "data": { ... } } envelope.
+    final service = top['data'] is Map
+        ? _toStringMap(top['data'] as Map)
+        : top;
+
+    // Check data["plans"] and data["service_plans"] only — no guessing.
+    final raw = service['plans'] ?? service['service_plans'];
+    if (raw is! List || raw.isEmpty) return [];
+
+    final result = <ServicePlan>[];
+    for (final item in raw) {
+      if (item is! Map) continue;
+      try {
+        result.add(ServicePlan.fromJson(_toStringMap(item)));
+      } catch (e) {
+        _log('Plan parse error: $e  item=$item');
+      }
+    }
+    return result;
+  }
+
+  // ── List / category / search parsing ─────────────────────────────────────
+
+  List<CategoryModel> _parseCategories(dynamic data) {
+    final result = <CategoryModel>[];
+    for (final item in _extractList(data)) {
+      if (item is! Map) continue;
+      try {
+        result.add(CategoryModel.fromJson(_toStringMap(item)));
+      } catch (e) {
+        _log('Category parse error: $e');
+      }
+    }
+    return result;
+  }
+
+  List<dynamic> _extractList(dynamic data) {
+    if (data is List) return data;
+    if (data is Map) {
+      for (final key in const [
+        'data', 'payload', 'services', 'results', 'items', 'records'
+      ]) {
+        final val = data[key];
+        // Direct array: { "data": [...] }
+        if (val is List) return val;
+        // Laravel pagination: { "data": { "current_page": 1, "data": [...] } }
+        if (val is Map) {
+          for (final inner in const [
+            'data', 'items', 'records', 'results'
+          ]) {
+            if (val[inner] is List) return val[inner] as List;
+          }
+        }
+      }
+    }
+    return [];
+  }
+
+  List<ServiceModel> _parseServices(
+    List<dynamic> raw,
+    List<CategoryModel> categories,
+  ) {
+    final result = <ServiceModel>[];
+    for (final item in raw) {
+      if (item == null) continue;
+      try {
+        final map = item is Map<String, dynamic>
+            ? item
+            : _toStringMap(item as Map);
+        var svc = ServiceModel.fromJson(map);
+        if (svc.category.isEmpty && svc.categoryId != null) {
+          final cat =
+              categories.where((c) => c.id == svc.categoryId).firstOrNull;
+          if (cat != null) {
+            svc = svc.copyWith(
+              category: cat.name,
+              color: ServiceModel._colorFor(cat.name),
+            );
+          }
+        }
+        result.add(svc);
+      } catch (e) {
+        _log('Service parse error: $e');
+      }
+    }
+    return result;
+  }
+
+  List<ServiceModel> _applySearch(List<ServiceModel> services, String query) {
+    if (query.isEmpty) return services;
+    final q = query.toLowerCase();
+    return services
+        .where((s) =>
+            s.name.toLowerCase().contains(q) ||
+            s.category.toLowerCase().contains(q) ||
+            s.description.toLowerCase().contains(q))
+        .toList();
+  }
+
+  Map<String, dynamic> _toStringMap(Map m) =>
+      m.map((k, v) => MapEntry(k.toString(), v));
+
+  // ── Error helpers ─────────────────────────────────────────────────────────
+
+  String _errorMessage(Object e) =>
+      e is DioException ? _dioError(e) : 'Something went wrong.';
+
+  String _dioError(DioException e) {
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+      case DioExceptionType.connectionError:
+      case DioExceptionType.unknown:
+        if (e.response == null) {
+          return 'Network error. Please check your connection.';
+        }
+        break;
+      case DioExceptionType.badCertificate:
+        return 'Secure connection failed.';
+      case DioExceptionType.cancel:
+        return 'Request cancelled.';
+      case DioExceptionType.badResponse:
+        break;
+    }
+    final statusCode = e.response?.statusCode;
+    if (statusCode == 401 || statusCode == 403) {
+      return 'Session expired. Please log in again.';
+    }
+    if (statusCode != null && statusCode >= 500) {
+      return 'Server error. Please try again later.';
+    }
+    final data = e.response?.data;
+    if (data is Map) return data['message'] as String? ?? 'Something went wrong.';
+    return 'Failed to load. Please try again.';
   }
 }

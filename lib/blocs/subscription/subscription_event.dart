@@ -3,23 +3,25 @@ part of 'subscription_bloc.dart';
 abstract class SubscriptionEvent extends Equatable {
   const SubscriptionEvent();
   @override
-  List<Object> get props => [];
+  List<Object?> get props => [];
 }
+
+// ── Load / refresh ────────────────────────────────────────────────────────────
 
 class SubscriptionLoaded extends SubscriptionEvent {
   const SubscriptionLoaded();
 }
 
-class SubscriptionAdded extends SubscriptionEvent {
-  final String serviceName;
-  final String serviceIcon;
-  final String plan;
-  final String billingCycle;
-  final double amount;
-  final DateTime nextRenewal;
-  final String cardId;
-  final int reminderDays;
+class SubscriptionsRefreshRequested extends SubscriptionEvent {
+  const SubscriptionsRefreshRequested();
+}
 
+// ── Create via API ────────────────────────────────────────────────────────────
+
+/// Dispatched by AddSubscriptionScreen. Contains both display info (name/icon)
+/// and API fields (serviceId, planId, cardId) so the bloc can POST to the API
+/// and update the service name cache in one step.
+class SubscriptionAdded extends SubscriptionEvent {
   const SubscriptionAdded({
     required this.serviceName,
     required this.serviceIcon,
@@ -29,21 +31,56 @@ class SubscriptionAdded extends SubscriptionEvent {
     required this.nextRenewal,
     required this.cardId,
     required this.reminderDays,
+    this.serviceId,
+    this.planId,
+    this.cardApiId,
+    this.priority = 'medium',
   });
 
-  @override
-  List<Object> get props => [serviceName, plan];
-}
-
-class SubscriptionUpdated extends SubscriptionEvent {
-  final String id;
+  final String serviceName;
+  final String serviceIcon;
   final String plan;
   final String billingCycle;
   final double amount;
+  final DateTime nextRenewal;
   final String cardId;
   final int reminderDays;
-  final DateTime nextRenewal;
+  // API fields (null-safe – only available when coming from the service browser)
+  final int? serviceId;
+  final int? planId;
+  final int? cardApiId;
+  final String priority;
 
+  @override
+  List<Object?> get props => [serviceName, plan, serviceId];
+}
+
+// ── API actions ───────────────────────────────────────────────────────────────
+
+class SubscriptionCancelRequested extends SubscriptionEvent {
+  const SubscriptionCancelRequested(this.id);
+  final int id;
+  @override
+  List<Object?> get props => [id];
+}
+
+class SubscriptionPauseRequested extends SubscriptionEvent {
+  const SubscriptionPauseRequested(this.id);
+  final int id;
+  @override
+  List<Object?> get props => [id];
+}
+
+class SubscriptionResumeRequested extends SubscriptionEvent {
+  const SubscriptionResumeRequested(this.id);
+  final int id;
+  @override
+  List<Object?> get props => [id];
+}
+
+// ── Local edit (edit screen – no PUT endpoint yet) ────────────────────────────
+
+class SubscriptionUpdated extends SubscriptionEvent {
   const SubscriptionUpdated({
     required this.id,
     required this.plan,
@@ -54,20 +91,32 @@ class SubscriptionUpdated extends SubscriptionEvent {
     required this.nextRenewal,
   });
 
+  final String id;
+  final String plan;
+  final String billingCycle;
+  final double amount;
+  final String cardId;
+  final int reminderDays;
+  final DateTime nextRenewal;
+
   @override
-  List<Object> get props => [id];
+  List<Object?> get props => [id];
 }
 
+// ── Legacy events kept for backward compatibility ─────────────────────────────
+
+/// Maps to SubscriptionCancelRequested internally (via int.tryParse on id).
 class SubscriptionCancelled extends SubscriptionEvent {
-  final String id;
   const SubscriptionCancelled(this.id);
+  final String id;
   @override
-  List<Object> get props => [id];
+  List<Object?> get props => [id];
 }
 
+/// Removes the subscription from local state only (for UI cleanup after delete).
 class SubscriptionDeleted extends SubscriptionEvent {
-  final String id;
   const SubscriptionDeleted(this.id);
+  final String id;
   @override
-  List<Object> get props => [id];
+  List<Object?> get props => [id];
 }

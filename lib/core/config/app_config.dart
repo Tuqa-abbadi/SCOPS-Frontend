@@ -1,8 +1,7 @@
 class AppConfig {
   AppConfig._();
 
-  static const String _defaultApiBaseUrl =
-      'https://overgenerous-supercerebrally-russel.ngrok-free.dev/api';
+  static const String _defaultApiBaseUrl = 'https://scops-api.onrender.com/api';
 
   static const String _apiBaseUrlFromEnvironment = String.fromEnvironment(
     'API_BASE_URL',

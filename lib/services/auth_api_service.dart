@@ -31,8 +31,8 @@ class AuthApiService {
     return _dio.post(
       ApiConstants.register,
       data: {
-        'firstName': firstName,
-        'lastName': lastName,
+        'first_name': firstName,
+        'last_name': lastName,
         'email': email,
         'phone': phone,
         'password': password,

@@ -16,8 +16,11 @@ import 'blocs/profile/change_password_bloc.dart';
 import 'repositories/auth_repository.dart';
 import 'repositories/cards_repository.dart';
 import 'repositories/profile_repository.dart';
+import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'services/token_storage_service.dart';
+
+const bool designMode = false;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,13 +61,15 @@ class ScopsApp extends StatelessWidget {
           create: (_) => LogoutBloc(authRepository: authRepository),
         ),
         BlocProvider<ChangePasswordBloc>(
-          create: (_) => ChangePasswordBloc(profileRepository: ProfileRepository()),
+          create: (_) =>
+              ChangePasswordBloc(profileRepository: ProfileRepository()),
         ),
         BlocProvider<DashboardBloc>(create: (_) => DashboardBloc()),
         BlocProvider<ServicesBloc>(create: (_) => ServicesBloc()),
         BlocProvider<WalletBloc>(
           create: (_) =>
-              WalletBloc(cardsRepository: CardsRepository())..add(const WalletLoaded()),
+              WalletBloc(cardsRepository: CardsRepository())
+                ..add(const WalletLoaded()),
         ),
         BlocProvider<SubscriptionBloc>(
           create: (_) => SubscriptionBloc()..add(const SubscriptionLoaded()),
@@ -74,7 +79,7 @@ class ScopsApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         title: 'SCOPS',
         theme: AppTheme.darkTheme,
-        home: const SplashScreen(),
+        home: designMode ? const DashboardScreen() : const SplashScreen(),
       ),
     );
   }
