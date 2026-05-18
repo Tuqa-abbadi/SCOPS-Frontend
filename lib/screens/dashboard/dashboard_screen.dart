@@ -9,7 +9,6 @@ import '../../blocs/wallet/wallet_bloc.dart';
 import '../services/services_browser_screen.dart';
 import '../wallet/wallet_screen.dart';
 import '../profile/profile_screen.dart';
-import '../subscription/add_subscription_screen.dart';
 import '../subscription/edit_subscription_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -23,7 +22,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   int _currentIndex = 0;
   int _navFromIndex = 0;
   int _navToIndex = 0;
-  bool _isOpeningAdd = false;
   late AnimationController _chartCtrl;
   late Animation<double> _chartAnim;
   late AnimationController _navCtrl;
@@ -76,25 +74,25 @@ class _DashboardScreenState extends State<DashboardScreen>
   static String _guessCategory(String name) {
     final n = name.toLowerCase();
     if (['netflix', 'disney', 'youtube', 'hulu', 'hbo', 'prime', 'apple tv']
-        .any((s) => n.contains(s))) return 'Streaming';
+        .any((s) => n.contains(s))) { return 'Streaming'; }
     if (['spotify', 'apple music', 'tidal', 'deezer', 'soundcloud']
-        .any((s) => n.contains(s))) return 'Music';
+        .any((s) => n.contains(s))) { return 'Music'; }
     if (['notion', 'slack', 'zoom', 'monday', 'asana', 'office', 'microsoft']
-        .any((s) => n.contains(s))) return 'Work';
+        .any((s) => n.contains(s))) { return 'Work'; }
     if (['icloud', 'dropbox', 'google one', 'onedrive', 'drive']
-        .any((s) => n.contains(s))) return 'Storage';
+        .any((s) => n.contains(s))) { return 'Storage'; }
     if (['github', 'gitlab', 'jetbrains', 'aws', 'vercel', 'digitalocean']
-        .any((s) => n.contains(s))) return 'Developer';
+        .any((s) => n.contains(s))) { return 'Developer'; }
     if (['figma', 'adobe', 'canva', 'sketch']
-        .any((s) => n.contains(s))) return 'Design';
+        .any((s) => n.contains(s))) { return 'Design'; }
     if (['openai', 'chatgpt', 'claude', 'gemini', 'midjourney']
-        .any((s) => n.contains(s))) return 'AI';
+        .any((s) => n.contains(s))) { return 'AI'; }
     if (['xbox', 'playstation', 'steam', 'nintendo', 'game pass']
-        .any((s) => n.contains(s))) return 'Gaming';
+        .any((s) => n.contains(s))) { return 'Gaming'; }
     if (['gym', 'fitness', 'strava', 'peloton', 'calm', 'headspace']
-        .any((s) => n.contains(s))) return 'Fitness';
+        .any((s) => n.contains(s))) { return 'Fitness'; }
     if (['bank', 'wallet', 'trading', 'finance', 'quickbooks']
-        .any((s) => n.contains(s))) return 'Finance';
+        .any((s) => n.contains(s))) { return 'Finance'; }
     return 'Other';
   }
 
@@ -139,20 +137,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   // ── Navigation ────────────────────────────────────────────────────────────
-  void _openAddSubscription() {
-    if (_isOpeningAdd) return;
-    _isOpeningAdd = true;
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => MultiBlocProvider(
-        providers: [
-          BlocProvider.value(value: context.read<SubscriptionBloc>()),
-          BlocProvider.value(value: context.read<WalletBloc>()),
-        ],
-        child: const AddSubscriptionScreen(),
-      ),
-    )).whenComplete(() => mounted ? setState(() => _isOpeningAdd = false) : null);
-  }
-
   void _openSubDetail(SubscriptionModel sub) {
     Navigator.push(
       context,
@@ -828,67 +812,4 @@ class _DonutPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DonutPainter old) =>
       old.progress != progress || old.centerLabel != centerLabel;
-}
-
-// ── Bottom nav painter ────────────────────────────────────────────────────
-class _BottomNavWavePainter extends CustomPainter {
-  const _BottomNavWavePainter({required this.circleCenter});
-
-  final double circleCenter;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final fill = Paint()
-      ..color = const Color(0xFF08111C).withValues(alpha: 0.96)
-      ..style = PaintingStyle.fill;
-    final border = Paint()
-      ..color = Colors.white.withValues(alpha: 0.07)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    final glow = Paint()
-      ..color = const Color(0xFFFF5A14).withValues(alpha: 0.10)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16);
-
-    final path = Path();
-    final cx = circleCenter.clamp(48.0, size.width - 48.0);
-    const corner = 28.0;
-    const waveWidth = 92.0;
-    const waveDepth = 20.0;
-
-    path.moveTo(corner, 0);
-    path.lineTo(cx - waveWidth / 2, 0);
-    path.cubicTo(
-      cx - 34,
-      0,
-      cx - 32,
-      waveDepth,
-      cx,
-      waveDepth,
-    );
-    path.cubicTo(
-      cx + 32,
-      waveDepth,
-      cx + 34,
-      0,
-      cx + waveWidth / 2,
-      0,
-    );
-    path.lineTo(size.width - corner, 0);
-    path.quadraticBezierTo(size.width, 0, size.width, corner);
-    path.lineTo(size.width, size.height - corner);
-    path.quadraticBezierTo(size.width, size.height, size.width - corner, size.height);
-    path.lineTo(corner, size.height);
-    path.quadraticBezierTo(0, size.height, 0, size.height - corner);
-    path.lineTo(0, corner);
-    path.quadraticBezierTo(0, 0, corner, 0);
-    path.close();
-
-    canvas.drawPath(path.shift(const Offset(0, 2)), glow);
-    canvas.drawPath(path, fill);
-    canvas.drawPath(path, border);
-  }
-
-  @override
-  bool shouldRepaint(covariant _BottomNavWavePainter oldDelegate) =>
-      oldDelegate.circleCenter != circleCenter;
 }
