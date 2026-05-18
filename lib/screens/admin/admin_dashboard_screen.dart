@@ -1,4 +1,4 @@
-import 'dart:math' as math;
+﻿import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -133,6 +133,7 @@ const _white = Colors.white;
 const _muted = Color(0xFF9BA4B0);
 
 final _currency = NumberFormat.currency(symbol: r'$', decimalDigits: 0);
+final _nf = NumberFormat('#,##0');
 
 final _mockUsers = [
   _AdminUser(
@@ -292,9 +293,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: _orange.withOpacity(0.12),
+                color: _orange.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _orange.withOpacity(0.34)),
+                border: Border.all(color: _orange.withValues(alpha: 0.34)),
               ),
               child: const Row(
                 children: [
@@ -343,7 +344,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             const SizedBox(height: 18),
             Row(
               children: [
-                const AdminSectionTitle('Reports'),
+                const _AdminSectionTitle('Reports'),
                 const Spacer(),
                 _periodSelector(),
               ],
@@ -356,37 +357,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
               childAspectRatio: 1.18,
-              children: const [
-                AdminMetricCard(value: '1,247', label: 'Total Users', icon: Icons.people_rounded, color: _cyan, trend: '+12%'),
-                AdminMetricCard(value: '893', label: 'Active Users', icon: Icons.verified_user_rounded, color: _green, trend: '72% active'),
-                AdminMetricCard(value: '48', label: 'Total Services', icon: Icons.apps_rounded, color: _orange, trend: '41 active'),
-                AdminMetricCard(value: '4,821', label: 'Subscriptions', icon: Icons.subscriptions_rounded, color: _purple, trend: '4,256 active'),
-                AdminMetricCard(value: r'$38.5k', label: 'Monthly Spending', icon: Icons.payments_rounded, color: _orange, trend: '+8.4%'),
-                AdminMetricCard(value: '3.2%', label: 'Churn Rate', icon: Icons.trending_down_rounded, color: _red, trend: '-0.6%'),
+              children: [
+                _AdminMetricCard(value: _nf.format(_AdminStats.totalUsers), label: 'Total Users', icon: Icons.people_rounded, color: _cyan, trend: '+12%'),
+                _AdminMetricCard(value: '${_AdminStats.activeUsers}', label: 'Active Users', icon: Icons.verified_user_rounded, color: _green, trend: '72% active'),
+                _AdminMetricCard(value: '${_AdminStats.totalServices}', label: 'Total Services', icon: Icons.apps_rounded, color: _orange, trend: '41 active'),
+                _AdminMetricCard(value: _nf.format(_AdminStats.totalSubscriptions), label: 'Subscriptions', icon: Icons.subscriptions_rounded, color: _purple, trend: '${_nf.format(_AdminStats.activeSubscriptions)} active'),
+                _AdminMetricCard(value: '\$${(_AdminStats.monthlyUserSpending / 1000).toStringAsFixed(1)}k', label: 'Monthly Spending', icon: Icons.payments_rounded, color: _orange, trend: '+8.4%'),
+                _AdminMetricCard(value: '${_AdminStats.churnRate}%', label: 'Churn Rate', icon: Icons.trending_down_rounded, color: _red, trend: '-0.6%'),
               ],
             ),
             const SizedBox(height: 18),
             Row(
               children: [
-                Expanded(child: _miniInsight('Retention', '91.4%', _green, Icons.favorite_rounded)),
+                Expanded(child: _miniInsight('Retention', '${_AdminStats.retentionRate}%', _green, Icons.favorite_rounded)),
                 const SizedBox(width: 12),
-                Expanded(child: _miniInsight('Canceled', '565', _red, Icons.remove_circle_rounded)),
+                Expanded(child: _miniInsight('Canceled', '${_AdminStats.inactiveSubscriptions}', _red, Icons.remove_circle_rounded)),
               ],
             ),
             const SizedBox(height: 18),
-            AdminChartCard(
+            _AdminChartCard(
               title: 'User Growth',
               subtitle: 'New users by month',
               child: _growthBarChart(),
             ),
             const SizedBox(height: 14),
-            AdminChartCard(
+            _AdminChartCard(
               title: 'Subscription Distribution',
               subtitle: 'Status split',
               child: _donutChart(),
             ),
             const SizedBox(height: 14),
-            AdminChartCard(
+            _AdminChartCard(
               title: 'Top Services',
               subtitle: 'Subscribers by service',
               child: Column(children: _mockServices.map(_topServiceBar).toList()),
@@ -396,16 +397,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               spacing: 10,
               runSpacing: 10,
               children: [
-                AdminActionButton(icon: Icons.download_rounded, label: 'Export CSV', color: _cyan, onTap: () => _mockMessage('CSV export queued')),
-                AdminActionButton(icon: Icons.notifications_active_rounded, label: 'Send Push', color: _orange, onTap: _showNotificationSheet),
-                AdminActionButton(icon: Icons.person_add_alt_1_rounded, label: 'Add User', color: _orange, onTap: _showAddUserSheet),
-                AdminActionButton(icon: Icons.add_business_rounded, label: 'Add Service', color: _cyan, onTap: () => _showServiceSheet()),
+                _AdminActionButton(icon: Icons.download_rounded, label: 'Export CSV', color: _cyan, onTap: () => _mockMessage('CSV export queued')),
+                _AdminActionButton(icon: Icons.notifications_active_rounded, label: 'Send Push', color: _orange, onTap: _showNotificationSheet),
+                _AdminActionButton(icon: Icons.person_add_alt_1_rounded, label: 'Add User', color: _orange, onTap: _showAddUserSheet),
+                _AdminActionButton(icon: Icons.add_business_rounded, label: 'Add Service', color: _cyan, onTap: () => _showServiceSheet()),
               ],
             ),
             const SizedBox(height: 22),
-            const AdminSectionTitle('Recent Activity'),
+            const _AdminSectionTitle('Recent Activity'),
             const SizedBox(height: 12),
-            ..._activity.map((event) => AdminActivityTile(event: event)),
+            ..._activity.map((event) => _AdminActivityTile(event: event)),
           ],
         ),
       );
@@ -440,7 +441,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             child: ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
               itemCount: _filteredUsers.length,
-              itemBuilder: (_, index) => AdminUserCard(
+              itemBuilder: (_, index) => _AdminUserCard(
                 user: _filteredUsers[index],
                 onTap: () => _showUserDetail(_filteredUsers[index]),
               ),
@@ -456,9 +457,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           children: [
             Row(
               children: [
-                const AdminSectionTitle('Services'),
+                const _AdminSectionTitle('Services'),
                 const Spacer(),
-                AdminActionButton(icon: Icons.add_rounded, label: 'Add Service', color: _orange, onTap: () => _showServiceSheet()),
+                _AdminActionButton(icon: Icons.add_rounded, label: 'Add Service', color: _orange, onTap: () => _showServiceSheet()),
               ],
             ),
             const SizedBox(height: 12),
@@ -470,13 +471,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               ],
             ),
             const SizedBox(height: 14),
-            AdminChartCard(
+            _AdminChartCard(
               title: 'Subscriptions by Service',
               subtitle: 'Active subscriber concentration',
               child: Column(children: _mockServices.map(_topServiceBar).toList()),
             ),
             const SizedBox(height: 14),
-            ..._mockServices.map((service) => AdminServiceCard(
+            ..._mockServices.map((service) => _AdminServiceCard(
                   service: service,
                   onEdit: () => _showServiceSheet(service: service),
                   onToggle: () => _mockMessage(service.isActive ? 'Service deactivated' : 'Service activated'),
@@ -501,7 +502,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               ],
             ),
             const SizedBox(height: 22),
-            const AdminSectionTitle('Recent Feedback'),
+            const _AdminSectionTitle('Recent Feedback'),
             const SizedBox(height: 12),
             ..._mockFeedback.map(_feedbackTile),
           ],
@@ -522,7 +523,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               decoration: BoxDecoration(
                 color: const Color(0xFF080C10),
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: _cyan.withOpacity(0.28), width: 1.2),
+                border: Border.all(color: _cyan.withValues(alpha: 0.28), width: 1.2),
               ),
             ),
             Positioned.fill(
@@ -534,8 +535,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       center: const Alignment(1.0, -1.0),
                       radius: 1.4,
                       colors: [
-                        _cyan.withOpacity(0.30),
-                        _cyan.withOpacity(0.10),
+                        _cyan.withValues(alpha: 0.30),
+                        _cyan.withValues(alpha: 0.10),
                         Colors.transparent,
                       ],
                       stops: const [0.0, 0.35, 0.75],
@@ -553,15 +554,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _AdminHeroIcon(),
-                              SizedBox(height: 16),
-                              Text(r'$38,492', style: TextStyle(color: Color(0xFFF4FBFC), fontSize: 38, fontWeight: FontWeight.w900, height: 1)),
-                              SizedBox(height: 4),
-                              Text('Monthly User Spending', style: TextStyle(color: Color(0xFFA8B9C3), fontSize: 12, fontWeight: FontWeight.w500)),
+                              const _AdminHeroIcon(),
+                              const SizedBox(height: 16),
+                              Text(_currency.format(_AdminStats.monthlyUserSpending), style: const TextStyle(color: Color(0xFFF4FBFC), fontSize: 38, fontWeight: FontWeight.w900, height: 1)),
+                              const SizedBox(height: 4),
+                              const Text('Monthly User Spending', style: TextStyle(color: Color(0xFFA8B9C3), fontSize: 12, fontWeight: FontWeight.w500)),
                             ],
                           ),
                         ),
@@ -585,7 +586,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           minY: 18,
           maxY: 42,
           borderData: FlBorderData(show: false),
-          gridData: FlGridData(show: true, drawVerticalLine: false, getDrawingHorizontalLine: (_) => FlLine(color: _cyan.withOpacity(0.045), strokeWidth: 1)),
+          gridData: FlGridData(show: true, drawVerticalLine: false, getDrawingHorizontalLine: (_) => FlLine(color: _cyan.withValues(alpha: 0.045), strokeWidth: 1)),
           titlesData: const FlTitlesData(show: false),
           lineBarsData: [
             LineChartBarData(
@@ -593,17 +594,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               isCurved: true,
               color: _cyan,
               barWidth: 2.4,
-              shadow: Shadow(color: _cyan.withOpacity(0.24), blurRadius: 12),
+              shadow: Shadow(color: _cyan.withValues(alpha: 0.24), blurRadius: 12),
               dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
-                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [_cyan.withOpacity(0.18), _cyan.withOpacity(0.055), _cyan.withOpacity(0.00)]),
+                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [_cyan.withValues(alpha: 0.18), _cyan.withValues(alpha: 0.055), _cyan.withValues(alpha: 0.00)]),
               ),
             ),
             LineChartBarData(
               spots: const [FlSpot(0, 20), FlSpot(1, 21), FlSpot(2, 23), FlSpot(3, 25), FlSpot(4, 26), FlSpot(5, 29), FlSpot(6, 31)],
               isCurved: true,
-              color: const Color(0xFF7BA6B5).withOpacity(0.26),
+              color: const Color(0xFF7BA6B5).withValues(alpha: 0.26),
               barWidth: 1.4,
               dotData: const FlDotData(show: false),
             ),
@@ -616,7 +617,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         child: BarChart(
           BarChartData(
             borderData: FlBorderData(show: false),
-            gridData: FlGridData(show: true, drawVerticalLine: false, getDrawingHorizontalLine: (_) => FlLine(color: _white.withOpacity(0.05), strokeWidth: 1)),
+            gridData: FlGridData(show: true, drawVerticalLine: false, getDrawingHorizontalLine: (_) => FlLine(color: _white.withValues(alpha: 0.05), strokeWidth: 1)),
             titlesData: FlTitlesData(
               topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -667,16 +668,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         margin: const EdgeInsets.only(bottom: 9),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: _field.withOpacity(0.72),
+          color: _field.withValues(alpha: 0.72),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _white.withOpacity(0.055)),
+          border: Border.all(color: _white.withValues(alpha: 0.055)),
         ),
         child: Row(
           children: [
             Container(
               width: 9,
               height: 9,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withOpacity(0.22), blurRadius: 8)]),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withValues(alpha: 0.22), blurRadius: 8)]),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -685,7 +686,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 children: [
                   Text(label, style: const TextStyle(color: _white, fontSize: 12, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 2),
-                  Text(detail, style: TextStyle(color: _muted.withOpacity(0.70), fontSize: 10, fontWeight: FontWeight.w600)),
+                  Text(detail, style: TextStyle(color: _muted.withValues(alpha: 0.70), fontSize: 10, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
@@ -710,7 +711,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(value: pct, minHeight: 8, backgroundColor: _white.withOpacity(0.06), valueColor: AlwaysStoppedAnimation(service.isActive ? _cyan : _muted)),
+              child: LinearProgressIndicator(value: pct, minHeight: 8, backgroundColor: _white.withValues(alpha: 0.06), valueColor: AlwaysStoppedAnimation(service.isActive ? _cyan : _muted)),
             ),
           ),
           const SizedBox(width: 10),
@@ -728,7 +729,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           style: const TextStyle(color: _white, fontSize: 14),
           decoration: InputDecoration(
             hintText: 'Search users',
-            hintStyle: TextStyle(color: _muted.withOpacity(0.65), fontSize: 13),
+            hintStyle: TextStyle(color: _muted.withValues(alpha: 0.65), fontSize: 13),
             prefixIcon: const Icon(Icons.search_rounded, color: _muted, size: 20),
             border: InputBorder.none,
             contentPadding: const EdgeInsets.symmetric(vertical: 13),
@@ -745,9 +746,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? _cyan.withOpacity(0.12) : _card,
+          color: selected ? _cyan.withValues(alpha: 0.12) : _card,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: selected ? _cyan.withOpacity(0.45) : _white.withOpacity(0.07)),
+          border: Border.all(color: selected ? _cyan.withValues(alpha: 0.45) : _white.withValues(alpha: 0.07)),
         ),
         child: Text(label, style: TextStyle(color: selected ? _cyan : _muted, fontSize: 12, fontWeight: FontWeight.w800)),
       ),
@@ -782,7 +783,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                         Expanded(
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: LinearProgressIndicator(value: pct, minHeight: 7, backgroundColor: _white.withOpacity(0.06), valueColor: const AlwaysStoppedAnimation(_yellow)),
+                            child: LinearProgressIndicator(value: pct, minHeight: 7, backgroundColor: _white.withValues(alpha: 0.06), valueColor: const AlwaysStoppedAnimation(_yellow)),
                           ),
                         ),
                         const SizedBox(width: 7),
@@ -813,7 +814,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             const SizedBox(height: 8),
             Text(feedback.comment, style: const TextStyle(color: _muted, fontSize: 12, height: 1.45)),
             const SizedBox(height: 8),
-            Text(DateFormat('MMM d, yyyy').format(feedback.date), style: TextStyle(color: _muted.withOpacity(0.60), fontSize: 10)),
+            Text(DateFormat('MMM d, yyyy').format(feedback.date), style: TextStyle(color: _muted.withValues(alpha: 0.60), fontSize: 10)),
           ],
         ),
       );
@@ -823,7 +824,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         decoration: _adminDecoration(color, radius: 18, opacity: 0.15),
         child: Row(
           children: [
-            Container(width: 34, height: 34, decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: color, size: 17)),
+            Container(width: 34, height: 34, decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: color, size: 17)),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -843,7 +844,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         child: Container(
           width: 48,
           height: 48,
-          decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(16), border: Border.all(color: color.withOpacity(0.28))),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(16), border: Border.all(color: color.withValues(alpha: 0.28))),
           child: Icon(icon, color: color, size: 20),
         ),
       );
@@ -855,7 +856,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         itemBuilder: (_) => ['This Month', '3 Months', 'Year'].map((period) => PopupMenuItem(value: period, child: Text(period, style: const TextStyle(color: _white)))).toList(),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          decoration: BoxDecoration(color: _field, borderRadius: BorderRadius.circular(12), border: Border.all(color: _white.withOpacity(0.08))),
+          decoration: BoxDecoration(color: _field, borderRadius: BorderRadius.circular(12), border: Border.all(color: _white.withValues(alpha: 0.08))),
           child: Row(
             children: [
               Text(_reportPeriod, style: const TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w800)),
@@ -869,7 +870,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   Widget _serviceAvatar(String icon, Color color) => Container(
         width: 38,
         height: 38,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: color.withOpacity(0.12), border: Border.all(color: color.withOpacity(0.35))),
+        decoration: BoxDecoration(shape: BoxShape.circle, color: color.withValues(alpha: 0.12), border: Border.all(color: color.withValues(alpha: 0.35))),
         child: Center(child: Text(icon, style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w900))),
       );
 
@@ -911,7 +912,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               ],
             ),
             const SizedBox(height: 20),
-            const AdminSectionTitle('Subscriptions'),
+            const _AdminSectionTitle('Subscriptions'),
             const SizedBox(height: 10),
             ...user.subscriptionsList.map(_subscriptionTile),
             const SizedBox(height: 18),
@@ -919,10 +920,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               spacing: 10,
               runSpacing: 10,
               children: [
-                AdminActionButton(icon: Icons.edit_rounded, label: 'Edit User', color: _cyan, onTap: () => _mockMessage('Edit user opened')),
-                AdminActionButton(icon: Icons.lock_reset_rounded, label: 'Reset Password', color: _orange, onTap: () => _mockMessage('Password reset sent')),
-                AdminActionButton(icon: user.isActive ? Icons.block_rounded : Icons.check_circle_rounded, label: user.isActive ? 'Deactivate' : 'Activate', color: user.isActive ? _orange : _green, onTap: () => _mockMessage('Status updated')),
-                AdminActionButton(icon: Icons.delete_rounded, label: 'Delete User', color: _red, onTap: () => _confirmDanger('Delete user?', 'This mock action would remove ${user.name}.')),
+                _AdminActionButton(icon: Icons.edit_rounded, label: 'Edit User', color: _cyan, onTap: () => _mockMessage('Edit user opened')),
+                _AdminActionButton(icon: Icons.lock_reset_rounded, label: 'Reset Password', color: _orange, onTap: () => _mockMessage('Password reset sent')),
+                _AdminActionButton(icon: user.isActive ? Icons.block_rounded : Icons.check_circle_rounded, label: user.isActive ? 'Deactivate' : 'Activate', color: user.isActive ? _orange : _green, onTap: () => _mockMessage('Status updated')),
+                _AdminActionButton(icon: Icons.delete_rounded, label: 'Delete User', color: _red, onTap: () => _confirmDanger('Delete user?', 'This mock action would remove ${user.name}.')),
               ],
             ),
           ],
@@ -934,7 +935,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   Widget _subscriptionTile(_AdminSubscription sub) => Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: _field, borderRadius: BorderRadius.circular(16), border: Border.all(color: _white.withOpacity(0.06))),
+        decoration: BoxDecoration(color: _field, borderRadius: BorderRadius.circular(16), border: Border.all(color: _white.withValues(alpha: 0.06))),
         child: Row(
           children: [
             Expanded(
@@ -954,7 +955,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   Widget _infoPill(String label, String value, Color color) => Container(
         width: 142,
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: color.withOpacity(0.09), borderRadius: BorderRadius.circular(16), border: Border.all(color: color.withOpacity(0.18))),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.09), borderRadius: BorderRadius.circular(16), border: Border.all(color: color.withValues(alpha: 0.18))),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(label, style: const TextStyle(color: _muted, fontSize: 10, fontWeight: FontWeight.w700)),
           const SizedBox(height: 5),
@@ -976,7 +977,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               const SizedBox(height: 12),
               const _AdminTextField(label: 'Role', icon: Icons.badge_rounded),
               const SizedBox(height: 16),
-              AdminActionButton(icon: Icons.person_add_alt_1_rounded, label: 'Create User', color: _orange, expanded: true, onTap: () => _mockMessage('User created locally')),
+              _AdminActionButton(icon: Icons.person_add_alt_1_rounded, label: 'Create User', color: _orange, expanded: true, onTap: () => _mockMessage('User created locally')),
             ],
           ),
         ),
@@ -1002,7 +1003,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               const SizedBox(height: 12),
               _AdminTextField(label: 'Description', icon: Icons.description_rounded, initialValue: service?.description, maxLines: 3),
               const SizedBox(height: 16),
-              AdminActionButton(icon: Icons.save_rounded, label: service == null ? 'Create Service' : 'Save Service', color: _orange, expanded: true, onTap: () => _mockMessage('Service saved locally')),
+              _AdminActionButton(icon: Icons.save_rounded, label: service == null ? 'Create Service' : 'Save Service', color: _orange, expanded: true, onTap: () => _mockMessage('Service saved locally')),
             ],
           ),
         ),
@@ -1022,7 +1023,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               const SizedBox(height: 12),
               const _AdminTextField(label: 'Target audience', icon: Icons.groups_rounded, initialValue: 'All active users'),
               const SizedBox(height: 16),
-              AdminActionButton(icon: Icons.send_rounded, label: 'Send Notification', color: _orange, expanded: true, onTap: () => _mockMessage('Notification sent locally')),
+              _AdminActionButton(icon: Icons.send_rounded, label: 'Send Notification', color: _orange, expanded: true, onTap: () => _mockMessage('Notification sent locally')),
             ],
           ),
         ),
@@ -1033,7 +1034,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: _card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22), side: BorderSide(color: _red.withOpacity(0.24))),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22), side: BorderSide(color: _red.withValues(alpha: 0.24))),
         title: Text(title, style: const TextStyle(color: _white, fontWeight: FontWeight.w900)),
         content: Text(message, style: const TextStyle(color: _muted)),
         actions: [
@@ -1057,15 +1058,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   }
 }
 
-class AdminMetricCard extends StatelessWidget {
+class _AdminMetricCard extends StatelessWidget {
   final String value;
   final String label;
   final IconData icon;
   final Color color;
   final String trend;
 
-  const AdminMetricCard({
-    super.key,
+  const _AdminMetricCard({
     required this.value,
     required this.label,
     required this.icon,
@@ -1082,13 +1082,13 @@ class AdminMetricCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(width: 34, height: 34, decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: color, size: 17)),
+          Container(width: 34, height: 34, decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: color, size: 17)),
           const Spacer(),
           Text(value, style: TextStyle(color: color, fontSize: 21, fontWeight: FontWeight.w900), maxLines: 1),
           const SizedBox(height: 3),
           Text(label, style: const TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
           const SizedBox(height: 3),
-          Text(trend, style: TextStyle(color: _muted.withOpacity(0.65), fontSize: 9, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
+          Text(trend, style: TextStyle(color: _muted.withValues(alpha: 0.65), fontSize: 9, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
         ],
       ),
     );
@@ -1104,7 +1104,7 @@ class _AdminHeroIcon extends StatelessWidget {
       width: 36,
       height: 36,
       decoration: BoxDecoration(
-        color: _cyan.withOpacity(0.15),
+        color: _cyan.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(11),
       ),
       child: const Icon(Icons.account_balance_wallet_rounded, color: _cyan, size: 20),
@@ -1112,12 +1112,12 @@ class _AdminHeroIcon extends StatelessWidget {
   }
 }
 
-class AdminChartCard extends StatelessWidget {
+class _AdminChartCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final Widget child;
 
-  const AdminChartCard({super.key, required this.title, required this.subtitle, required this.child});
+  const _AdminChartCard({required this.title, required this.subtitle, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -1138,11 +1138,11 @@ class AdminChartCard extends StatelessWidget {
   }
 }
 
-class AdminUserCard extends StatelessWidget {
+class _AdminUserCard extends StatelessWidget {
   final _AdminUser user;
   final VoidCallback onTap;
 
-  const AdminUserCard({super.key, required this.user, required this.onTap});
+  const _AdminUserCard({required this.user, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -1157,7 +1157,7 @@ class AdminUserCard extends StatelessWidget {
             Container(
               width: 44,
               height: 44,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: (user.isActive ? _cyan : _muted).withOpacity(0.12), border: Border.all(color: (user.isActive ? _cyan : _muted).withOpacity(0.35))),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: (user.isActive ? _cyan : _muted).withValues(alpha: 0.12), border: Border.all(color: (user.isActive ? _cyan : _muted).withValues(alpha: 0.35))),
               child: Center(child: Text(user.name[0], style: TextStyle(color: user.isActive ? _cyan : _muted, fontSize: 18, fontWeight: FontWeight.w900))),
             ),
             const SizedBox(width: 12),
@@ -1186,7 +1186,7 @@ class AdminUserCard extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: _white.withOpacity(0.25), size: 20),
+            Icon(Icons.chevron_right_rounded, color: _white.withValues(alpha: 0.25), size: 20),
           ],
         ),
       ),
@@ -1194,14 +1194,13 @@ class AdminUserCard extends StatelessWidget {
   }
 }
 
-class AdminServiceCard extends StatelessWidget {
+class _AdminServiceCard extends StatelessWidget {
   final _AdminService service;
   final VoidCallback onEdit;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
 
-  const AdminServiceCard({
-    super.key,
+  const _AdminServiceCard({
     required this.service,
     required this.onEdit,
     required this.onToggle,
@@ -1220,7 +1219,7 @@ class AdminServiceCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(width: 44, height: 44, decoration: BoxDecoration(shape: BoxShape.circle, color: _cyan.withOpacity(0.12), border: Border.all(color: _cyan.withOpacity(0.28))), child: Center(child: Text(service.icon, style: const TextStyle(color: _cyan, fontSize: 18, fontWeight: FontWeight.w900)))),
+              Container(width: 44, height: 44, decoration: BoxDecoration(shape: BoxShape.circle, color: _cyan.withValues(alpha: 0.12), border: Border.all(color: _cyan.withValues(alpha: 0.28))), child: Center(child: Text(service.icon, style: const TextStyle(color: _cyan, fontSize: 18, fontWeight: FontWeight.w900)))),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1252,15 +1251,14 @@ class AdminServiceCard extends StatelessWidget {
   }
 }
 
-class AdminActionButton extends StatelessWidget {
+class _AdminActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
   final VoidCallback onTap;
   final bool expanded;
 
-  const AdminActionButton({
-    super.key,
+  const _AdminActionButton({
     required this.icon,
     required this.label,
     required this.color,
@@ -1274,7 +1272,7 @@ class AdminActionButton extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(color: color.withOpacity(0.11), borderRadius: BorderRadius.circular(16), border: Border.all(color: color.withOpacity(0.28))),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.11), borderRadius: BorderRadius.circular(16), border: Border.all(color: color.withValues(alpha: 0.28))),
         child: Row(
           mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1290,10 +1288,10 @@ class AdminActionButton extends StatelessWidget {
   }
 }
 
-class AdminActivityTile extends StatelessWidget {
+class _AdminActivityTile extends StatelessWidget {
   final _ActivityEvent event;
 
-  const AdminActivityTile({super.key, required this.event});
+  const _AdminActivityTile({required this.event});
 
   @override
   Widget build(BuildContext context) {
@@ -1303,7 +1301,7 @@ class AdminActivityTile extends StatelessWidget {
       decoration: _adminDecoration(event.color, radius: 18, opacity: 0.08),
       child: Row(
         children: [
-          Container(width: 36, height: 36, decoration: BoxDecoration(color: event.color.withOpacity(0.13), borderRadius: BorderRadius.circular(12)), child: Icon(event.icon, color: event.color, size: 17)),
+          Container(width: 36, height: 36, decoration: BoxDecoration(color: event.color.withValues(alpha: 0.13), borderRadius: BorderRadius.circular(12)), child: Icon(event.icon, color: event.color, size: 17)),
           const SizedBox(width: 11),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1312,17 +1310,17 @@ class AdminActivityTile extends StatelessWidget {
               Text(event.detail, style: const TextStyle(color: _muted, fontSize: 11), overflow: TextOverflow.ellipsis),
             ]),
           ),
-          Text(_relativeTime(event.date), style: TextStyle(color: _muted.withOpacity(0.65), fontSize: 10, fontWeight: FontWeight.w700)),
+          Text(_relativeTime(event.date), style: TextStyle(color: _muted.withValues(alpha: 0.65), fontSize: 10, fontWeight: FontWeight.w700)),
         ],
       ),
     );
   }
 }
 
-class AdminSectionTitle extends StatelessWidget {
+class _AdminSectionTitle extends StatelessWidget {
   final String title;
 
-  const AdminSectionTitle(this.title, {super.key});
+  const _AdminSectionTitle(this.title);
 
   @override
   Widget build(BuildContext context) {
@@ -1348,7 +1346,7 @@ class _AdminSheet extends StatelessWidget {
         child: ListView(
           controller: controller,
           children: [
-            Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: _white.withOpacity(0.16), borderRadius: BorderRadius.circular(99)))),
+            Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: _white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(99)))),
             const SizedBox(height: 18),
             Row(
               children: [
@@ -1385,8 +1383,8 @@ class _AdminTextField extends StatelessWidget {
         prefixIcon: Icon(icon, color: _cyan, size: 19),
         filled: true,
         fillColor: _field,
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: _white.withOpacity(0.07))),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: _cyan.withOpacity(0.42))),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: _white.withValues(alpha: 0.07))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: _cyan.withValues(alpha: 0.42))),
       ),
     );
   }
@@ -1395,25 +1393,25 @@ class _AdminTextField extends StatelessWidget {
 BoxDecoration _adminDecoration(Color color, {double radius = 18, double opacity = 0.14}) => BoxDecoration(
       color: _card,
       borderRadius: BorderRadius.circular(radius),
-      border: Border.all(color: color.withOpacity(opacity)),
-      boxShadow: [BoxShadow(color: color.withOpacity(0.045), blurRadius: 22, offset: const Offset(0, 12))],
+      border: Border.all(color: color.withValues(alpha: opacity)),
+      boxShadow: [BoxShadow(color: color.withValues(alpha: 0.045), blurRadius: 22, offset: const Offset(0, 12))],
     );
 
 Widget _statusPill(String label, Color color) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(999), border: Border.all(color: color.withOpacity(0.18))),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999), border: Border.all(color: color.withValues(alpha: 0.18))),
       child: Text(label, style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w900)),
     );
 
 Widget _smallBadge(String label, Color color) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: color.withOpacity(0.10), borderRadius: BorderRadius.circular(9)),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(9)),
       child: Text(label, style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w900)),
     );
 
 Widget _trendPill(String label, Color color) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(999), border: Border.all(color: color.withOpacity(0.20))),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999), border: Border.all(color: color.withValues(alpha: 0.20))),
       child: Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w900)),
     );
 
@@ -1429,3 +1427,4 @@ String _relativeTime(DateTime date) {
   if (diff.inHours < 24) return '${diff.inHours}h';
   return '${diff.inDays}d';
 }
+
