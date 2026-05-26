@@ -9,21 +9,19 @@ class CardsApiService {
 
   Future<Response<dynamic>> getCards() => _dio.get(ApiConstants.cards);
 
-  Future<Response<dynamic>> addCard({
+  /// POST /api/cards/setup-intent — returns {client_secret, customer_id}
+  Future<Response<dynamic>> createSetupIntent() =>
+      _dio.post(ApiConstants.cardsSetupIntent);
+
+  /// POST /api/cards — saves the Stripe payment method to the backend
+  Future<Response<dynamic>> saveStripeCard({
+    required String paymentMethodId,
     required String cardHolderName,
-    required String cardNumber,
-    required int expiryMonth,
-    required int expiryYear,
   }) =>
-      _dio.post(
-        ApiConstants.cards,
-        data: {
-          'card_holder_name': cardHolderName,
-          'card_number': cardNumber,
-          'expiry_month': expiryMonth,
-          'expiry_year': expiryYear,
-        },
-      );
+      _dio.post(ApiConstants.cards, data: {
+        'stripe_payment_method_id': paymentMethodId,
+        'card_holder_name': cardHolderName,
+      });
 
   Future<Response<dynamic>> deleteCard(String cardId) =>
       _dio.delete(ApiConstants.cardById(cardId));

@@ -53,6 +53,9 @@ class AuthInterceptor extends Interceptor {
 
       final refreshDio = Dio(BaseOptions(
         baseUrl: baseUrl,
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+        sendTimeout: const Duration(seconds: 30),
         headers: const {'ngrok-skip-browser-warning': 'true'},
       ));
 

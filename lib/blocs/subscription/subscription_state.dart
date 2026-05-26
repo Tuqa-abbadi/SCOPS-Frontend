@@ -19,6 +19,7 @@ class SubscriptionModel extends Equatable {
     required this.reminderDays,
     this.status = SubscriptionStatus.active,
     this.priority = 'medium',
+    this.startDate,
   });
 
   final String id;          // String of apiId, used by existing UI
@@ -36,6 +37,7 @@ class SubscriptionModel extends Equatable {
   final int reminderDays;
   final SubscriptionStatus status;
   final String priority;
+  final DateTime? startDate; // null only for locally-created subscriptions
 
   bool get isActive    => status == SubscriptionStatus.active;
   bool get isPaused    => status == SubscriptionStatus.paused;
@@ -51,6 +53,7 @@ class SubscriptionModel extends Equatable {
     DateTime? nextRenewal,
     SubscriptionStatus? status,
     String? priority,
+    DateTime? startDate,
   }) =>
       SubscriptionModel(
         id: id,
@@ -68,10 +71,12 @@ class SubscriptionModel extends Equatable {
         reminderDays: reminderDays ?? this.reminderDays,
         status: status ?? this.status,
         priority: priority ?? this.priority,
+        startDate: startDate ?? this.startDate,
       );
 
   @override
-  List<Object?> get props => [id, plan, billingCycle, amount, status, priority];
+  List<Object?> get props =>
+      [id, plan, billingCycle, amount, status, priority, startDate];
 }
 
 // ── States ────────────────────────────────────────────────────────────────────

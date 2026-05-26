@@ -21,14 +21,22 @@ class SplashBloc extends Bloc<SplashEvent, SplashState> {
     await Future.delayed(const Duration(milliseconds: 200));
     emit(const SplashVisible());
 
-    final isLoggedIn = await _authRepository.validateSession();
+    final isLoggedIn = await _authRepository
+        .validateSession(allowNetworkFallback: false)
+        .timeout(const Duration(seconds: 12), onTimeout: () => false);
 
     await Future.delayed(const Duration(seconds: 3));
 
     if (isLoggedIn) {
-      emit(const SplashNavigateToDashboard());
+      final user = await _authRepository.getUser();
+      if (user != null && user.isAdmin) {
+        emit(const SplashNavigateToAdminDashboard());
+      } else {
+        emit(const SplashNavigateToDashboard());
+      }
     } else {
       emit(const SplashNavigateToOnboarding());
     }
   }
+
 }

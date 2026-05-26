@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/user/user_cubit.dart';
+import '../admin/admin_dashboard_screen.dart';
 import '../dashboard/dashboard_screen.dart';
 import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
@@ -305,9 +306,14 @@ class _LoginScreenState extends State<LoginScreen> {
       listener: (context, state) {
         if (state is LoginSuccess) {
           context.read<UserCubit>().setUser(state.user);
+          final isAdmin = state.user?.isAdmin ?? false;
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => const DashboardScreen()),
+            MaterialPageRoute(
+              builder: (_) => isAdmin
+                  ? const AdminDashboardScreen()
+                  : const DashboardScreen(),
+            ),
           );
         }
       },

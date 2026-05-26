@@ -1,18 +1,10 @@
 class AppConfig {
   AppConfig._();
 
-  static const String _defaultApiBaseUrl = 'https://scops-api.onrender.com/api';
+  static const String apiBaseUrl =
+      'https://overgenerous-supercerebrally-russel.ngrok-free.dev/api/';
 
-  static const String _apiBaseUrlFromEnvironment = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: _defaultApiBaseUrl,
-  );
-
-  static String get apiBaseUrl =>
-      _withTrailingSlash(_apiBaseUrlFromEnvironment.trim());
-
-  static String _withTrailingSlash(String url) {
-    if (url.endsWith('/')) return url;
-    return '$url/';
-  }
+  // Replace with your Stripe publishable key (pk_test_... or pk_live_...)
+  static const String stripePublishableKey =
+      'pk_test_51TUp3MBPRNYSBx0kpt8EzbT8knbP13LRB3hTVfHAUbbET7Z7XShhD42XlvYn5gS8AcaLGW270MT2pLVrMT5R4AeW00sf4x6LPT';
 }

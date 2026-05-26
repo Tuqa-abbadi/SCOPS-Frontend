@@ -22,3 +22,7 @@ class SplashNavigateToOnboarding extends SplashState {
 class SplashNavigateToDashboard extends SplashState {
   const SplashNavigateToDashboard();
 }
+
+class SplashNavigateToAdminDashboard extends SplashState {
+  const SplashNavigateToAdminDashboard();
+}

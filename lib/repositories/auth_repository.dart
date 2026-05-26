@@ -128,8 +128,9 @@ class AuthRepository {
 
   /// Verifies the stored session is still accepted by the backend.
   /// Clears tokens and returns false if the session is expired or invalid.
-  /// Returns true on network errors so users aren't kicked out for poor connectivity.
-  Future<bool> validateSession() async {
+  /// Returns true on network errors so users aren't kicked out for poor connectivity
+  /// unless [allowNetworkFallback] is false.
+  Future<bool> validateSession({bool allowNetworkFallback = true}) async {
     final accessToken = await _tokenStorage.getAccessToken();
     if (accessToken == null || accessToken.isEmpty) return false;
 
@@ -162,9 +163,9 @@ class AuthRepository {
         return false;
       }
       // Network/server error — don't kick the user out, let the app try normally.
-      return true;
+      return allowNetworkFallback;
     } catch (_) {
-      return true;
+      return allowNetworkFallback;
     }
   }
 

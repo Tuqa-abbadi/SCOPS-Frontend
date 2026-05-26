@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../blocs/splash/splash_bloc.dart';
+import '../admin/admin_dashboard_screen.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../dashboard/dashboard_screen.dart';
 
@@ -53,16 +54,17 @@ class _SplashScreenState extends State<SplashScreen> {
         if (state is SplashNavigateToOnboarding) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(
-              builder: (_) => const OnboardingScreen(),
-            ),
+            MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+          );
+        } else if (state is SplashNavigateToAdminDashboard) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
           );
         } else if (state is SplashNavigateToDashboard) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(
-              builder: (_) => const DashboardScreen(),
-            ),
+            MaterialPageRoute(builder: (_) => const DashboardScreen()),
           );
         }
       },

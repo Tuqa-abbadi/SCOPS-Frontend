@@ -123,6 +123,7 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
         cardId: event.cardId,
         reminderDays: event.reminderDays,
         priority: event.priority,
+        startDate: DateTime.now(),
       );
       final List<SubscriptionModel> subs = [...(current?.subscriptions ?? []), sub];
       emit(SubscriptionData(subscriptions: subs));
@@ -319,6 +320,7 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
         reminderDays: api.reminderDays,
         status: _parseStatus(api.status),
         priority: api.priority,
+        startDate: api.startDate,
       );
     } catch (e) {
       _log('Model conversion error: $e');

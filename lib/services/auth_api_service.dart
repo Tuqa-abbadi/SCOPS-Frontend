@@ -56,6 +56,9 @@ class AuthApiService {
   Future<Response<dynamic>> refreshSession(String refreshToken) {
     final freshDio = Dio(BaseOptions(
       baseUrl: ApiConstants.baseUrl,
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 30),
+      sendTimeout: const Duration(seconds: 30),
       headers: const {'ngrok-skip-browser-warning': 'true'},
     ));
     return freshDio.post(

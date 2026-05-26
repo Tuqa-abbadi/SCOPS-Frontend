@@ -1,8 +1,50 @@
 ﻿import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+
+import '../../blocs/admin/admin_bloc.dart';
+import '../../blocs/auth/auth_bloc.dart';
+import '../../blocs/user/user_cubit.dart';
+import '../splash/splash_screen.dart';
+
+// ── Palette ───────────────────────────────────────────────────────────────────
+const _bg = Color(0xFF020812);
+const _card = Color(0xFF07111C);
+const _field = Color(0xFF0B1521);
+const _cyan = Color(0xFF18E8F2);
+const _orange = Color(0xFFFF5A14);
+const _orangeLight = Color(0xFFFF8C42);
+const _green = Color(0xFF22C55E);
+const _red = Color(0xFFFF4D4D);
+const _purple = Color(0xFFA855F7);
+const _white = Colors.white;
+const _muted = Color(0xFF9BA4B0);
+
+final _fmt = NumberFormat.currency(symbol: r'$', decimalDigits: 0);
+
+// ── Nav destinations ──────────────────────────────────────────────────────────
+
+class _NavDest {
+  const _NavDest(this.activeIcon, this.icon, this.label, this.index);
+  final IconData activeIcon;
+  final IconData icon;
+  final String label;
+  final int index;
+}
+
+const _navItems = [
+  _NavDest(Icons.dashboard_rounded, Icons.dashboard_outlined, 'Dashboard', 0),
+  _NavDest(Icons.people_rounded, Icons.people_outline_rounded, 'Users', 1),
+  _NavDest(Icons.apps_rounded, Icons.apps_outlined, 'Services', 2),
+  _NavDest(Icons.person_rounded, Icons.person_outline_rounded, 'Profile', 3),
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -11,736 +53,976 @@ class AdminDashboardScreen extends StatefulWidget {
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
 }
 
-enum _UserFilter { all, active, inactive, highSpend }
-
-class _AdminStats {
-  static const totalUsers = 1247;
-  static const activeUsers = 893;
-  static const totalServices = 48;
-  static const activeServices = 41;
-  static const totalSubscriptions = 4821;
-  static const activeSubscriptions = 4256;
-  static const inactiveSubscriptions = 565;
-  static const monthlyUserSpending = 38492.50;
-  static const churnRate = 3.2;
-  static const retentionRate = 91.4;
-}
-
-class _AdminSubscription {
-  final String service;
-  final String plan;
-  final double price;
-  final String status;
-  final DateTime renewsAt;
-
-  const _AdminSubscription({
-    required this.service,
-    required this.plan,
-    required this.price,
-    required this.status,
-    required this.renewsAt,
-  });
-}
-
-class _AdminUser {
-  final String id;
-  final String name;
-  final String email;
-  final String role;
-  final int subscriptions;
-  final double monthlySpend;
-  final DateTime joinedAt;
-  final bool isActive;
-  final List<_AdminSubscription> subscriptionsList;
-
-  const _AdminUser({
-    required this.id,
-    required this.name,
-    required this.email,
-    required this.role,
-    required this.subscriptions,
-    required this.monthlySpend,
-    required this.joinedAt,
-    required this.isActive,
-    required this.subscriptionsList,
-  });
-}
-
-class _AdminService {
-  final String id;
-  final String icon;
-  final String name;
-  final String category;
-  final String cycle;
-  final String description;
-  final double price;
-  final int activeSubscribers;
-  final bool isActive;
-
-  const _AdminService({
-    required this.id,
-    required this.icon,
-    required this.name,
-    required this.category,
-    required this.cycle,
-    required this.description,
-    required this.price,
-    required this.activeSubscribers,
-    required this.isActive,
-  });
-}
-
-class _RecentFeedback {
-  final String user;
-  final int rating;
-  final String comment;
-  final DateTime date;
-
-  const _RecentFeedback({
-    required this.user,
-    required this.rating,
-    required this.comment,
-    required this.date,
-  });
-}
-
-class _ActivityEvent {
-  final IconData icon;
-  final String title;
-  final String detail;
-  final Color color;
-  final DateTime date;
-
-  const _ActivityEvent({
-    required this.icon,
-    required this.title,
-    required this.detail,
-    required this.color,
-    required this.date,
-  });
-}
-
-const _bg = Color(0xFF020812);
-const _card = Color(0xFF07111C);
-const _field = Color(0xFF0B1521);
-const _cyan = Color(0xFF18E8F2);
-const _orange = Color(0xFFFF5A14);
-const _green = Color(0xFF22C55E);
-const _red = Color(0xFFFF4D4D);
-const _purple = Color(0xFFA855F7);
-const _yellow = Color(0xFFFFB020);
-const _white = Colors.white;
-const _muted = Color(0xFF9BA4B0);
-
-final _currency = NumberFormat.currency(symbol: r'$', decimalDigits: 0);
-final _nf = NumberFormat('#,##0');
-
-final _mockUsers = [
-  _AdminUser(
-    id: 'u1',
-    name: 'Alex Architect',
-    email: 'alex@scops.app',
-    role: 'Power user',
-    subscriptions: 7,
-    monthlySpend: 124.50,
-    joinedAt: DateTime(2024, 9, 1),
-    isActive: true,
-    subscriptionsList: [
-      _AdminSubscription(service: 'Netflix', plan: 'Premium', price: 22.99, status: 'Active', renewsAt: DateTime(2026, 6, 2)),
-      _AdminSubscription(service: 'Adobe CC', plan: 'All Apps', price: 59.99, status: 'Active', renewsAt: DateTime(2026, 6, 8)),
-      _AdminSubscription(service: 'iCloud+', plan: '2 TB', price: 9.99, status: 'Active', renewsAt: DateTime(2026, 5, 28)),
-    ],
-  ),
-  _AdminUser(
-    id: 'u2',
-    name: 'Sara Builder',
-    email: 'sara@scops.app',
-    role: 'Team owner',
-    subscriptions: 5,
-    monthlySpend: 87.20,
-    joinedAt: DateTime(2024, 10, 15),
-    isActive: true,
-    subscriptionsList: [
-      _AdminSubscription(service: 'Spotify', plan: 'Family', price: 16.99, status: 'Active', renewsAt: DateTime(2026, 6, 5)),
-      _AdminSubscription(service: 'Figma', plan: 'Professional', price: 15.00, status: 'Active', renewsAt: DateTime(2026, 6, 10)),
-    ],
-  ),
-  _AdminUser(
-    id: 'u3',
-    name: 'Omar Dev',
-    email: 'omar@scops.app',
-    role: 'Developer',
-    subscriptions: 3,
-    monthlySpend: 42.00,
-    joinedAt: DateTime(2024, 11, 3),
-    isActive: false,
-    subscriptionsList: [
-      _AdminSubscription(service: 'GitHub', plan: 'Team', price: 4.00, status: 'Canceled', renewsAt: DateTime(2026, 5, 19)),
-      _AdminSubscription(service: 'ChatGPT', plan: 'Plus', price: 20.00, status: 'Inactive', renewsAt: DateTime(2026, 5, 22)),
-    ],
-  ),
-  _AdminUser(
-    id: 'u4',
-    name: 'Lena Manager',
-    email: 'lena@scops.app',
-    role: 'Finance lead',
-    subscriptions: 9,
-    monthlySpend: 210.80,
-    joinedAt: DateTime(2024, 8, 20),
-    isActive: true,
-    subscriptionsList: [
-      _AdminSubscription(service: 'Notion', plan: 'Business', price: 18.00, status: 'Active', renewsAt: DateTime(2026, 6, 1)),
-      _AdminSubscription(service: 'Dropbox', plan: 'Advanced', price: 30.00, status: 'Active', renewsAt: DateTime(2026, 5, 30)),
-      _AdminSubscription(service: 'Canva', plan: 'Teams', price: 14.99, status: 'Active', renewsAt: DateTime(2026, 6, 3)),
-    ],
-  ),
-];
-
-final _mockServices = [
-  _AdminService(id: 's1', icon: 'N', name: 'Netflix', category: 'Streaming', price: 22.99, cycle: 'Monthly', activeSubscribers: 342, isActive: true, description: 'Entertainment streaming subscription.'),
-  _AdminService(id: 's2', icon: 'S', name: 'Spotify', category: 'Music', price: 10.99, cycle: 'Monthly', activeSubscribers: 298, isActive: true, description: 'Music and podcast platform.'),
-  _AdminService(id: 's3', icon: 'A', name: 'Adobe CC', category: 'Design', price: 59.99, cycle: 'Monthly', activeSubscribers: 187, isActive: true, description: 'Creative cloud tools and storage.'),
-  _AdminService(id: 's4', icon: 'Y', name: 'YouTube Premium', category: 'Streaming', price: 13.99, cycle: 'Monthly', activeSubscribers: 156, isActive: false, description: 'Ad-free video and music bundle.'),
-  _AdminService(id: 's5', icon: 'I', name: 'iCloud+', category: 'Storage', price: 9.99, cycle: 'Monthly', activeSubscribers: 134, isActive: true, description: 'Cloud storage and privacy services.'),
-];
-
-final _mockFeedback = [
-  _RecentFeedback(user: 'Alex A.', rating: 5, comment: 'Love the design, very intuitive.', date: DateTime.now().subtract(const Duration(hours: 3))),
-  _RecentFeedback(user: 'Sara B.', rating: 4, comment: 'Great app. Would love dark widgets.', date: DateTime.now().subtract(const Duration(days: 1))),
-  _RecentFeedback(user: 'Omar D.', rating: 3, comment: 'Notifications sometimes late.', date: DateTime.now().subtract(const Duration(days: 2))),
-  _RecentFeedback(user: 'Lena M.', rating: 5, comment: 'The spending analytics are exactly what our team needed.', date: DateTime.now().subtract(const Duration(days: 4))),
-];
-
-final _activity = [
-  _ActivityEvent(icon: Icons.person_add_alt_1_rounded, title: 'User created', detail: 'Nadine H. was added by admin', color: _cyan, date: DateTime.now().subtract(const Duration(minutes: 18))),
-  _ActivityEvent(icon: Icons.lock_reset_rounded, title: 'Password reset', detail: 'Reset link sent to sara@scops.app', color: _orange, date: DateTime.now().subtract(const Duration(hours: 1))),
-  _ActivityEvent(icon: Icons.edit_rounded, title: 'Service edited', detail: 'Adobe CC pricing updated', color: _purple, date: DateTime.now().subtract(const Duration(hours: 4))),
-  _ActivityEvent(icon: Icons.cancel_rounded, title: 'Subscription canceled', detail: 'GitHub Team canceled for Omar Dev', color: _red, date: DateTime.now().subtract(const Duration(hours: 8))),
-  _ActivityEvent(icon: Icons.credit_card_off_rounded, title: 'Failed payment', detail: 'Netflix renewal failed for 3 users', color: _yellow, date: DateTime.now().subtract(const Duration(days: 1))),
-];
+enum _UserFilter { all, active, inactive }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabCtrl;
+    with TickerProviderStateMixin {
+  // ── Page state ─────────────────────────────────────────────────────────────
+  int _currentIndex = 0;
+  int _navFromIndex = 0;
+  int _navToIndex = 0;
+
+  // ── Nav animation (mirrors DashboardScreen) ────────────────────────────────
+  late final AnimationController _navCtrl;
+  late final Animation<double> _navAnim;
+
+  // ── Users tab state ────────────────────────────────────────────────────────
   final _searchCtrl = TextEditingController();
   _UserFilter _filter = _UserFilter.all;
-  String _reportPeriod = 'This Month';
 
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 4, vsync: this);
+    _navCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 680),
+    );
+    _navAnim = CurvedAnimation(parent: _navCtrl, curve: Curves.easeInOutCubic);
+    _navCtrl.value = 1;
+
     _searchCtrl.addListener(() => setState(() {}));
+
+    final bloc = context.read<AdminBloc>();
+    if (bloc.state is AdminInitial) bloc.add(const AdminLoaded());
   }
 
   @override
   void dispose() {
-    _tabCtrl.dispose();
+    _navCtrl.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
 
-  List<_AdminUser> get _filteredUsers {
-    final query = _searchCtrl.text.trim().toLowerCase();
-    return _mockUsers.where((user) {
-      final matchesSearch = query.isEmpty ||
-          user.name.toLowerCase().contains(query) ||
-          user.email.toLowerCase().contains(query);
-      final matchesFilter = switch (_filter) {
+  void _selectNavIndex(int index) {
+    if (_currentIndex == index) return;
+    setState(() {
+      _navFromIndex = _currentIndex;
+      _navToIndex = index;
+      _currentIndex = index;
+    });
+    _navCtrl.forward(from: 0);
+  }
+
+  // ── Filtered users ─────────────────────────────────────────────────────────
+
+  List<AdminUserModel> _filteredUsers(List<AdminUserModel> all) {
+    final q = _searchCtrl.text.trim().toLowerCase();
+    return all.where((u) {
+      final matchSearch =
+          q.isEmpty ||
+          u.fullName.toLowerCase().contains(q) ||
+          u.email.toLowerCase().contains(q) ||
+          u.role.toLowerCase().contains(q);
+      final matchFilter = switch (_filter) {
         _UserFilter.all => true,
-        _UserFilter.active => user.isActive,
-        _UserFilter.inactive => !user.isActive,
-        _UserFilter.highSpend => user.monthlySpend >= 100,
+        _UserFilter.active => u.isActive,
+        _UserFilter.inactive => !u.isActive,
       };
-      return matchesSearch && matchesFilter;
+      return matchSearch && matchFilter;
     }).toList();
   }
 
+  // ── Build ──────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _bg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _header(),
-            _tabs(),
-            Expanded(
-              child: TabBarView(
-                controller: _tabCtrl,
-                children: [
-                  _overviewTab(),
-                  _usersTab(),
-                  _servicesTab(),
-                  _feedbackTab(),
-                ],
-              ),
-            ),
-          ],
+    final user = context.read<UserCubit>().state;
+    if (user != null && !user.isAdmin) {
+      return _AccessDeniedScreen(onBack: () => Navigator.pop(context));
+    }
+
+    return BlocListener<LogoutBloc, AuthState>(
+      listener: (context, state) {
+        if (state is LogoutSuccess) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const SplashScreen()),
+            (_) => false,
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: _bg,
+        body: SafeArea(
+          bottom: true,
+          child: Column(
+            children: [
+              _buildHeader(),
+              Expanded(child: _buildBody()),
+              _bottomNav(),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _header() => Padding(
-        padding: const EdgeInsets.fromLTRB(8, 14, 16, 8),
-        child: Row(
-          children: [
-            IconButton(
-              onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _white, size: 20),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: _orange.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _orange.withValues(alpha: 0.34)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.shield_rounded, color: _orange, size: 14),
-                  SizedBox(width: 6),
-                  Text('ADMIN', style: TextStyle(color: _orange, fontSize: 11, fontWeight: FontWeight.w900)),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            const Expanded(
-              child: Text('SCOPS Control', style: TextStyle(color: _white, fontSize: 20, fontWeight: FontWeight.w900)),
-            ),
-            IconButton(
-              tooltip: 'Send push',
-              onPressed: _showNotificationSheet,
-              icon: const Icon(Icons.notifications_active_rounded, color: _orange),
-            ),
-          ],
+  // ── Header ─────────────────────────────────────────────────────────────────
+
+  Widget _buildHeader() => Container(
+    padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+    decoration: BoxDecoration(
+      color: _bg,
+      border: Border(
+        bottom: BorderSide(color: _cyan.withValues(alpha: 0.10)),
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: _cyan.withValues(alpha: 0.04),
+          blurRadius: 20,
+          offset: const Offset(0, 4),
         ),
-      );
-
-  Widget _tabs() => TabBar(
-        controller: _tabCtrl,
-        isScrollable: true,
-        tabAlignment: TabAlignment.start,
-        labelColor: _cyan,
-        unselectedLabelColor: _muted,
-        indicatorColor: _cyan,
-        indicatorSize: TabBarIndicatorSize.label,
-        labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-        tabs: const [
-          Tab(text: 'Overview'),
-          Tab(text: 'Users'),
-          Tab(text: 'Services'),
-          Tab(text: 'Feedback'),
-        ],
-      );
-
-  Widget _overviewTab() => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _heroSpendingCard(),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                const _AdminSectionTitle('Reports'),
-                const Spacer(),
-                _periodSelector(),
-              ],
-            ),
-            const SizedBox(height: 12),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 1.18,
-              children: [
-                _AdminMetricCard(value: _nf.format(_AdminStats.totalUsers), label: 'Total Users', icon: Icons.people_rounded, color: _cyan, trend: '+12%'),
-                _AdminMetricCard(value: '${_AdminStats.activeUsers}', label: 'Active Users', icon: Icons.verified_user_rounded, color: _green, trend: '72% active'),
-                _AdminMetricCard(value: '${_AdminStats.totalServices}', label: 'Total Services', icon: Icons.apps_rounded, color: _orange, trend: '41 active'),
-                _AdminMetricCard(value: _nf.format(_AdminStats.totalSubscriptions), label: 'Subscriptions', icon: Icons.subscriptions_rounded, color: _purple, trend: '${_nf.format(_AdminStats.activeSubscriptions)} active'),
-                _AdminMetricCard(value: '\$${(_AdminStats.monthlyUserSpending / 1000).toStringAsFixed(1)}k', label: 'Monthly Spending', icon: Icons.payments_rounded, color: _orange, trend: '+8.4%'),
-                _AdminMetricCard(value: '${_AdminStats.churnRate}%', label: 'Churn Rate', icon: Icons.trending_down_rounded, color: _red, trend: '-0.6%'),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(child: _miniInsight('Retention', '${_AdminStats.retentionRate}%', _green, Icons.favorite_rounded)),
-                const SizedBox(width: 12),
-                Expanded(child: _miniInsight('Canceled', '${_AdminStats.inactiveSubscriptions}', _red, Icons.remove_circle_rounded)),
-              ],
-            ),
-            const SizedBox(height: 18),
-            _AdminChartCard(
-              title: 'User Growth',
-              subtitle: 'New users by month',
-              child: _growthBarChart(),
-            ),
-            const SizedBox(height: 14),
-            _AdminChartCard(
-              title: 'Subscription Distribution',
-              subtitle: 'Status split',
-              child: _donutChart(),
-            ),
-            const SizedBox(height: 14),
-            _AdminChartCard(
-              title: 'Top Services',
-              subtitle: 'Subscribers by service',
-              child: Column(children: _mockServices.map(_topServiceBar).toList()),
-            ),
-            const SizedBox(height: 18),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                _AdminActionButton(icon: Icons.download_rounded, label: 'Export CSV', color: _cyan, onTap: () => _mockMessage('CSV export queued')),
-                _AdminActionButton(icon: Icons.notifications_active_rounded, label: 'Send Push', color: _orange, onTap: _showNotificationSheet),
-                _AdminActionButton(icon: Icons.person_add_alt_1_rounded, label: 'Add User', color: _orange, onTap: _showAddUserSheet),
-                _AdminActionButton(icon: Icons.add_business_rounded, label: 'Add Service', color: _cyan, onTap: () => _showServiceSheet()),
-              ],
-            ),
-            const SizedBox(height: 22),
-            const _AdminSectionTitle('Recent Activity'),
-            const SizedBox(height: 12),
-            ..._activity.map((event) => _AdminActivityTile(event: event)),
-          ],
+      ],
+    ),
+    child: Row(
+      children: [
+        Image.asset(
+          'assets/images/scops_admin.png',
+          width: 30,
+          height: 30,
+          fit: BoxFit.contain,
         ),
-      );
-
-  Widget _usersTab() => Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: Row(
-              children: [
-                Expanded(child: _searchField()),
-                const SizedBox(width: 10),
-                _squareButton(Icons.person_add_alt_1_rounded, _orange, _showAddUserSheet),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                _filterChip('All', _UserFilter.all),
-                _filterChip('Active', _UserFilter.active),
-                _filterChip('Inactive', _UserFilter.inactive),
-                _filterChip('High Spend', _UserFilter.highSpend),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              itemCount: _filteredUsers.length,
-              itemBuilder: (_, index) => _AdminUserCard(
-                user: _filteredUsers[index],
-                onTap: () => _showUserDetail(_filteredUsers[index]),
-              ),
-            ),
-          ),
-        ],
-      );
-
-  Widget _servicesTab() => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const _AdminSectionTitle('Services'),
-                const Spacer(),
-                _AdminActionButton(icon: Icons.add_rounded, label: 'Add Service', color: _orange, onTap: () => _showServiceSheet()),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: _miniInsight('Active Services', '${_AdminStats.activeServices}', _cyan, Icons.check_circle_rounded)),
-                const SizedBox(width: 12),
-                Expanded(child: _miniInsight('Subscribers', '1,117', _green, Icons.groups_rounded)),
-              ],
-            ),
-            const SizedBox(height: 14),
-            _AdminChartCard(
-              title: 'Subscriptions by Service',
-              subtitle: 'Active subscriber concentration',
-              child: Column(children: _mockServices.map(_topServiceBar).toList()),
-            ),
-            const SizedBox(height: 14),
-            ..._mockServices.map((service) => _AdminServiceCard(
-                  service: service,
-                  onEdit: () => _showServiceSheet(service: service),
-                  onToggle: () => _mockMessage(service.isActive ? 'Service deactivated' : 'Service activated'),
-                  onDelete: () => _confirmDanger('Delete service?', 'This mock action would remove ${service.name}.'),
-                )),
-          ],
-        ),
-      );
-
-  Widget _feedbackTab() => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _ratingSummary(),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(child: _miniInsight('Avg Rating', '4.3', _yellow, Icons.star_rounded)),
-                const SizedBox(width: 12),
-                Expanded(child: _miniInsight('Open Issues', '7', _orange, Icons.report_problem_rounded)),
-              ],
-            ),
-            const SizedBox(height: 22),
-            const _AdminSectionTitle('Recent Feedback'),
-            const SizedBox(height: 12),
-            ..._mockFeedback.map(_feedbackTile),
-          ],
-        ),
-      );
-
-  Widget _heroSpendingCard() => TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: 1),
-        duration: const Duration(milliseconds: 750),
-        curve: Curves.easeOutCubic,
-        builder: (context, value, child) => Transform.translate(
-          offset: Offset(0, 18 * (1 - value)),
-          child: Opacity(opacity: value, child: child),
-        ),
-        child: Stack(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF080C10),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: _cyan.withValues(alpha: 0.28), width: 1.2),
-              ),
-            ),
-            Positioned.fill(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: const Alignment(1.0, -1.0),
-                      radius: 1.4,
-                      colors: [
-                        _cyan.withValues(alpha: 0.30),
-                        _cyan.withValues(alpha: 0.10),
-                        Colors.transparent,
-                      ],
-                      stops: const [0.0, 0.35, 0.75],
-                    ),
-                  ),
+        const SizedBox(width: 10),
+        RichText(
+          text: const TextSpan(
+            children: [
+              TextSpan(
+                text: 'SCOPS',
+                style: TextStyle(
+                  color: _white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.4,
                 ),
               ),
+              TextSpan(
+                text: ' | ',
+                style: TextStyle(
+                  color: _muted,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w300,
+                  letterSpacing: 0,
+                ),
+              ),
+              TextSpan(
+                text: 'ADMIN',
+                style: TextStyle(
+                  color: _orange,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Spacer(),
+        if (_currentIndex != 3)
+          BlocBuilder<AdminBloc, AdminState>(
+            builder: (_, state) => IconButton(
+              tooltip: 'Refresh',
+              onPressed: state is AdminLoading
+                  ? null
+                  : () => context.read<AdminBloc>().add(
+                      const AdminRefreshRequested(),
+                    ),
+              icon: Icon(
+                Icons.refresh_rounded,
+                color: state is AdminLoading
+                    ? _muted.withValues(alpha: 0.35)
+                    : _muted,
+              ),
             ),
-            Positioned.fill(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const _AdminHeroIcon(),
-                              const SizedBox(height: 16),
-                              Text(_currency.format(_AdminStats.monthlyUserSpending), style: const TextStyle(color: Color(0xFFF4FBFC), fontSize: 38, fontWeight: FontWeight.w900, height: 1)),
-                              const SizedBox(height: 4),
-                              const Text('Monthly User Spending', style: TextStyle(color: Color(0xFFA8B9C3), fontSize: 12, fontWeight: FontWeight.w500)),
+          ),
+      ],
+    ),
+  );
+
+  // ── Body ───────────────────────────────────────────────────────────────────
+
+  Widget _buildBody() {
+    if (_currentIndex == 3) return _profilePage();
+
+    return BlocConsumer<AdminBloc, AdminState>(
+      listener: _handleState,
+      builder: (context, state) {
+        if (state is AdminLoading) {
+          return const Center(child: CircularProgressIndicator(color: _orange));
+        }
+        if (state is AdminError) {
+          return _ErrorView(
+            message: state.message,
+            onRetry: () =>
+                context.read<AdminBloc>().add(const AdminRefreshRequested()),
+          );
+        }
+        if (state is AdminData) {
+          return Stack(
+            children: [
+              IndexedStack(
+                index: _currentIndex,
+                children: [
+                  _overviewTab(state),
+                  _usersTab(state),
+                  _servicesTab(state),
+                ],
+              ),
+              if (state.isActionLoading) const _ActionLoadingOverlay(),
+            ],
+          );
+        }
+        return const SizedBox.shrink();
+      },
+    );
+  }
+
+  void _handleState(BuildContext context, AdminState state) {
+    if (state is! AdminData) return;
+    if (state.actionError != null) {
+      _showSnack(state.actionError!, isError: true);
+      context.read<AdminBloc>().add(const AdminActionErrorCleared());
+    }
+    if (state.actionSuccess != null) {
+      _showSnack(state.actionSuccess!);
+      context.read<AdminBloc>().add(const AdminActionErrorCleared());
+    }
+  }
+
+  void _showSnack(String msg, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: isError ? _red : _green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+    );
+  }
+
+  // ── SCOPS-style bottom nav ─────────────────────────────────────────────────
+
+  Widget _bottomNav() {
+    final activeSlot = _navItems.indexWhere(
+      (item) => item.index == _currentIndex,
+    );
+    final safeSlot = activeSlot < 0 ? 0 : activeSlot;
+    final activeItem = _navItems[safeSlot];
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+        child: SizedBox(
+          height: 86,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final slotWidth = width / _navItems.length;
+
+              double centerForIndex(int index) {
+                final slot = _navItems.indexWhere(
+                  (item) => item.index == index,
+                );
+                final safe = slot < 0 ? 0 : slot;
+                return (slotWidth * safe) + (slotWidth / 2);
+              }
+
+              return AnimatedBuilder(
+                animation: _navAnim,
+                builder: (context, _) {
+                  final t = _navAnim.value;
+                  final fromCenter = centerForIndex(_navFromIndex);
+                  final toCenter = centerForIndex(_navToIndex);
+                  final circleCenter = ui.lerpDouble(fromCenter, toCenter, t)!;
+                  final circleTop = 10 + (math.sin(t * math.pi) * 8);
+
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      // Floating pill container
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 4,
+                        height: 72,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(30),
+                            color: const Color(
+                              0xFF08111C,
+                            ).withValues(alpha: 0.96),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.07),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.38),
+                                blurRadius: 28,
+                                offset: const Offset(0, 14),
+                              ),
+                              BoxShadow(
+                                color: _orange.withValues(alpha: 0.07),
+                                blurRadius: 18,
+                                offset: const Offset(0, -2),
+                              ),
                             ],
                           ),
                         ),
-                        _trendPill('+8.4%', _green),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    const Text('Compared to last month', style: TextStyle(color: Color(0xFFA8B9C3), fontSize: 11, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 16),
-                    SizedBox(height: 132, child: _spendingLineChart()),
-                  ],
+                      ),
+                      // Nav items row
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 4,
+                        height: 72,
+                        child: Row(
+                          children: _navItems
+                              .map((item) => Expanded(child: _navItem(item)))
+                              .toList(),
+                        ),
+                      ),
+                      // Animated floating circle indicator
+                      Positioned(
+                        left: circleCenter - 20,
+                        top: circleTop,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _selectNavIndex(activeItem.index),
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: const LinearGradient(
+                                colors: [_orangeLight, _orange],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _orange.withValues(alpha: 0.32),
+                                  blurRadius: 18,
+                                  spreadRadius: 1,
+                                  offset: const Offset(0, 8),
+                                ),
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF08111C,
+                                  ).withValues(alpha: 0.90),
+                                  blurRadius: 10,
+                                  spreadRadius: -6,
+                                  offset: const Offset(0, 9),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              activeItem.activeIcon,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _navItem(_NavDest item) {
+    final isActive = _currentIndex == item.index;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _selectNavIndex(item.index),
+      child: SizedBox.expand(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                height: 40,
+                child: Center(
+                  child: AnimatedOpacity(
+                    opacity: isActive ? 0.0 : 1.0,
+                    duration: const Duration(milliseconds: 180),
+                    child: Icon(item.icon, size: 23, color: _muted),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 2),
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 180),
+                style: TextStyle(
+                  color: isActive ? _orangeLight : _muted,
+                  fontSize: 10.5,
+                  height: 1.0,
+                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                ),
+                child: Text(
+                  item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Profile page ───────────────────────────────────────────────────────────
+
+  Widget _profilePage() {
+    final user = context.watch<UserCubit>().state;
+    final adminState = context.watch<AdminBloc>().state;
+    final stats = adminState is AdminData ? adminState.statistics : null;
+    final initials = user != null && user.firstName.isNotEmpty
+        ? (user.firstName[0] +
+                  (user.lastName.isNotEmpty ? user.lastName[0] : ''))
+              .toUpperCase()
+        : 'A';
+    final fullName = user != null
+        ? '${user.firstName} ${user.lastName}'.trim()
+        : 'Administrator';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 28, 20, 40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Avatar
+          Container(
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _orange.withValues(alpha: 0.12),
+              border: Border.all(
+                color: _orange.withValues(alpha: 0.45),
+                width: 2.5,
+              ),
+            ),
+            child: Center(
+              child: Text(
+                initials,
+                style: const TextStyle(
+                  color: _orange,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
             ),
-          ],
-        ),
-      );
-
-  Widget _spendingLineChart() => LineChart(
-        LineChartData(
-          minY: 18,
-          maxY: 42,
-          borderData: FlBorderData(show: false),
-          gridData: FlGridData(show: true, drawVerticalLine: false, getDrawingHorizontalLine: (_) => FlLine(color: _cyan.withValues(alpha: 0.045), strokeWidth: 1)),
-          titlesData: const FlTitlesData(show: false),
-          lineBarsData: [
-            LineChartBarData(
-              spots: const [FlSpot(0, 22), FlSpot(1, 25), FlSpot(2, 24), FlSpot(3, 29), FlSpot(4, 31), FlSpot(5, 35), FlSpot(6, 38.5)],
-              isCurved: true,
-              color: _cyan,
-              barWidth: 2.4,
-              shadow: Shadow(color: _cyan.withValues(alpha: 0.24), blurRadius: 12),
-              dotData: const FlDotData(show: false),
-              belowBarData: BarAreaData(
-                show: true,
-                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [_cyan.withValues(alpha: 0.18), _cyan.withValues(alpha: 0.055), _cyan.withValues(alpha: 0.00)]),
-              ),
-            ),
-            LineChartBarData(
-              spots: const [FlSpot(0, 20), FlSpot(1, 21), FlSpot(2, 23), FlSpot(3, 25), FlSpot(4, 26), FlSpot(5, 29), FlSpot(6, 31)],
-              isCurved: true,
-              color: const Color(0xFF7BA6B5).withValues(alpha: 0.26),
-              barWidth: 1.4,
-              dotData: const FlDotData(show: false),
-            ),
-          ],
-        ),
-      );
-
-  Widget _growthBarChart() => SizedBox(
-        height: 180,
-        child: BarChart(
-          BarChartData(
-            borderData: FlBorderData(show: false),
-            gridData: FlGridData(show: true, drawVerticalLine: false, getDrawingHorizontalLine: (_) => FlLine(color: _white.withValues(alpha: 0.05), strokeWidth: 1)),
-            titlesData: FlTitlesData(
-              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 28, getTitlesWidget: (value, meta) {
-                const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-                final index = value.toInt();
-                return Text(index >= 0 && index < labels.length ? labels[index] : '', style: const TextStyle(color: _muted, fontSize: 10));
-              })),
-            ),
-            barGroups: [84, 96, 118, 141, 166, 193].asMap().entries.map((entry) {
-              return BarChartGroupData(x: entry.key, barRods: [
-                BarChartRodData(toY: entry.value.toDouble(), width: 14, borderRadius: BorderRadius.circular(8), color: entry.key.isEven ? _cyan : _orange),
-              ]);
-            }).toList(),
           ),
-        ),
-      );
-
-  Widget _donutChart() => Column(
-        children: [
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 142,
-            child: PieChart(
-              PieChartData(
-                centerSpaceRadius: 46,
-                sectionsSpace: 5,
-                startDegreeOffset: -90,
-                pieTouchData: PieTouchData(enabled: false),
-                borderData: FlBorderData(show: false),
-                sections: [
-                  PieChartSectionData(value: 72, color: _cyan, title: '', radius: 24, showTitle: false),
-                  PieChartSectionData(value: 18, color: _orange, title: '', radius: 24, showTitle: false),
-                  PieChartSectionData(value: 10, color: const Color(0xFFE66A6A), title: '', radius: 24, showTitle: false),
-                ],
-              ),
+          const SizedBox(height: 16),
+          Text(
+            fullName,
+            style: const TextStyle(
+              color: _white,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 18),
-          _donutLegendItem('Active', '72%', _cyan, '4,256 subscriptions'),
-          _donutLegendItem('Inactive', '18%', _orange, '392 subscriptions'),
-          _donutLegendItem('Canceled', '10%', const Color(0xFFE66A6A), '173 subscriptions'),
-        ],
-      );
-
-  Widget _donutLegendItem(String label, String percent, Color color, String detail) => Container(
-        margin: const EdgeInsets.only(bottom: 9),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: _field.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _white.withValues(alpha: 0.055)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 9,
-              height: 9,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withValues(alpha: 0.22), blurRadius: 8)]),
+          const SizedBox(height: 4),
+          if (user != null)
+            Text(
+              user.email,
+              style: const TextStyle(color: _muted, fontSize: 13),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label, style: const TextStyle(color: _white, fontSize: 12, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 2),
-                  Text(detail, style: TextStyle(color: _muted.withValues(alpha: 0.70), fontSize: 10, fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-            Text(percent, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w900)),
-          ],
-        ),
-      );
-
-  Widget _topServiceBar(_AdminService service) {
-    final maxSubscribers = _mockServices.map((s) => s.activeSubscribers).reduce(math.max);
-    final pct = service.activeSubscribers / maxSubscribers;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          _serviceAvatar(service.icon, service.isActive ? _cyan : _muted),
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 96,
-            child: Text(service.name, style: const TextStyle(color: _white, fontSize: 12, fontWeight: FontWeight.w800), overflow: TextOverflow.ellipsis),
-          ),
-          Expanded(
-            child: ClipRRect(
+          const SizedBox(height: 12),
+          // Role badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            decoration: BoxDecoration(
+              color: _orange.withValues(alpha: 0.11),
               borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(value: pct, minHeight: 8, backgroundColor: _white.withValues(alpha: 0.06), valueColor: AlwaysStoppedAnimation(service.isActive ? _cyan : _muted)),
+              border: Border.all(color: _orange.withValues(alpha: 0.30)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.shield_rounded, color: _orange, size: 14),
+                SizedBox(width: 6),
+                Text(
+                  'SCOPS Administrator',
+                  style: TextStyle(
+                    color: _orange,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 10),
-          Text('${service.activeSubscribers}', style: const TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 30),
+
+          // Stats row
+          if (stats != null) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: _ProfileStatCard(
+                    value: '${stats.totalUsers}',
+                    label: 'Total Users',
+                    icon: Icons.people_rounded,
+                    color: _cyan,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _ProfileStatCard(
+                    value: '${stats.totalServices}',
+                    label: 'Services',
+                    icon: Icons.apps_rounded,
+                    color: _purple,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _ProfileStatCard(
+                    value: '${stats.activeSubscriptions}',
+                    label: 'Active Subs',
+                    icon: Icons.subscriptions_rounded,
+                    color: _green,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 28),
+          ],
+
+          Divider(color: _white.withValues(alpha: 0.07)),
+          const SizedBox(height: 24),
+
+          _ProfileAction(
+            icon: Icons.exit_to_app_rounded,
+            label: 'Exit Admin Panel',
+            subtitle: 'Return to the SCOPS app',
+            color: _cyan,
+            onTap: () => Navigator.pop(context),
+          ),
+          const SizedBox(height: 12),
+          _ProfileAction(
+            icon: Icons.logout_rounded,
+            label: 'Sign Out',
+            subtitle: 'Log out of your account',
+            color: _red,
+            onTap: () => _confirmAction(
+              context,
+              title: 'Sign out?',
+              body: 'You will be logged out of SCOPS.',
+              confirmLabel: 'Sign Out',
+              confirmColor: _red,
+              onConfirm: () =>
+                  context.read<LogoutBloc>().add(const LogoutRequested()),
+            ),
+          ),
+          const SizedBox(height: 32),
+          Text(
+            'SCOPS Control Panel',
+            style: TextStyle(
+              color: _muted.withValues(alpha: 0.45),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.0,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _searchField() => Container(
-        height: 48,
-        decoration: _adminDecoration(_cyan, radius: 16, opacity: 0.08),
-        child: TextField(
-          controller: _searchCtrl,
-          style: const TextStyle(color: _white, fontSize: 14),
-          decoration: InputDecoration(
-            hintText: 'Search users',
-            hintStyle: TextStyle(color: _muted.withValues(alpha: 0.65), fontSize: 13),
-            prefixIcon: const Icon(Icons.search_rounded, color: _muted, size: 20),
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(vertical: 13),
+  // ── Overview tab ───────────────────────────────────────────────────────────
+
+  Widget _overviewTab(AdminData data) {
+    final stats = data.statistics;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (stats?.monthlyRevenue != null) _heroCard(stats!.monthlyRevenue!),
+          if (stats?.monthlyRevenue != null) const SizedBox(height: 18),
+
+          const _SectionTitle('Platform Statistics'),
+          const SizedBox(height: 12),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.22,
+            children: [
+              _MetricCard(
+                value: stats != null ? '${stats.totalUsers}' : '—',
+                label: 'Total Users',
+                icon: Icons.people_rounded,
+                color: _cyan,
+                sub: stats != null ? '${stats.activeUsers} active' : '',
+              ),
+              _MetricCard(
+                value: stats != null ? '${stats.totalServices}' : '—',
+                label: 'Services',
+                icon: Icons.apps_rounded,
+                color: _orange,
+                sub: data.services.length != stats?.totalServices
+                    ? '${data.services.length} loaded'
+                    : '',
+              ),
+              _MetricCard(
+                value: stats?.monthlyRevenue != null
+                    ? _fmt.format(stats!.monthlyRevenue!)
+                    : '—',
+                label: 'Revenue',
+                icon: Icons.account_balance_wallet_rounded,
+                color: _green,
+                sub: 'This month',
+              ),
+              _MetricCard(
+                value: stats != null
+                    ? '${(stats.totalSubscriptions - stats.activeSubscriptions).clamp(0, stats.totalSubscriptions)}'
+                    : '—',
+                label: 'Cancelled',
+                icon: Icons.cancel_rounded,
+                color: _red,
+                sub: stats?.churnRate != null
+                    ? '${stats!.churnRate!.toStringAsFixed(1)}% churn'
+                    : '',
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 22),
+          const _SectionTitle('Revenue Overview'),
+          const SizedBox(height: 12),
+          const _RevenueLineChart(),
+
+          const SizedBox(height: 22),
+          const _SectionTitle('Subscription Status'),
+          const SizedBox(height: 12),
+          _StatusDonutChart(stats: stats),
+
+          const SizedBox(height: 22),
+          const _SectionTitle('Quick Actions'),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _ActionBtn(
+                icon: Icons.person_add_alt_1_rounded,
+                label: 'Add User',
+                color: _orange,
+                onTap: () => _showUserForm(context),
+              ),
+              _ActionBtn(
+                icon: Icons.add_business_rounded,
+                label: 'Add Service',
+                color: _cyan,
+                onTap: () => _showServiceForm(context),
+              ),
+              _ActionBtn(
+                icon: Icons.people_rounded,
+                label: 'Manage Users',
+                color: _purple,
+                onTap: () => _selectNavIndex(1),
+              ),
+              _ActionBtn(
+                icon: Icons.apps_rounded,
+                label: 'Manage Services',
+                color: _green,
+                onTap: () => _selectNavIndex(2),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _heroCard(double revenue) => Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: const Color(0xFF070F1A),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: _cyan.withValues(alpha: 0.22), width: 1.0),
+      boxShadow: [
+        BoxShadow(
+          color: _cyan.withValues(alpha: 0.10),
+          blurRadius: 36,
+          offset: const Offset(0, 12),
+        ),
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.30),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _cyan.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: const Icon(
+                  Icons.account_balance_wallet_rounded,
+                  color: _cyan,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                _fmt.format(revenue),
+                style: const TextStyle(
+                  color: _white,
+                  fontSize: 34,
+                  fontWeight: FontWeight.w900,
+                  height: 1,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Monthly Revenue',
+                style: TextStyle(
+                  color: _muted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ),
-      );
+        _trendPill('Live', _cyan),
+      ],
+    ),
+  );
 
-  Widget _filterChip(String label, _UserFilter filter) {
-    final selected = _filter == filter;
+  // ignore: unused_element
+  Widget _subscriptionDistribution(AdminStatisticsModel stats) {
+    final active = stats.activeSubscriptions;
+    final total = stats.totalSubscriptions;
+    final inactive = (total - active).clamp(0, total);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: _adminDeco(_cyan, radius: 22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Subscription Status',
+                  style: TextStyle(
+                    color: _white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              _trendPill('$total total', _muted),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _distBar('Active', active, total, _green),
+          const SizedBox(height: 8),
+          _distBar('Inactive / Cancelled', inactive, total, _orange),
+        ],
+      ),
+    );
+  }
+
+  Widget _distBar(String label, int value, int total, Color color) {
+    final pct = total > 0 ? value / total : 0.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: _muted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Text(
+              '$value  ${(pct * 100).toStringAsFixed(0)}%',
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            minHeight: 7,
+            value: pct,
+            backgroundColor: _white.withValues(alpha: 0.06),
+            valueColor: AlwaysStoppedAnimation(color),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Users tab ──────────────────────────────────────────────────────────────
+
+  Widget _usersTab(AdminData data) {
+    final filtered = _filteredUsers(data.users);
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: Row(
+            children: [
+              Expanded(child: _searchField('Search users…')),
+              const SizedBox(width: 10),
+              _squareBtn(
+                Icons.person_add_alt_1_rounded,
+                _orange,
+                () => _showUserForm(context),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              _filterChip('All', _UserFilter.all),
+              _filterChip('Active', _UserFilter.active),
+              _filterChip('Inactive', _UserFilter.inactive),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Expanded(
+          child: filtered.isEmpty
+              ? _emptyState(
+                  icon: Icons.people_outline_rounded,
+                  message: data.users.isEmpty
+                      ? 'No users found.'
+                      : 'No users match your search.',
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  itemCount: filtered.length,
+                  itemBuilder: (_, i) => _UserCard(
+                    user: filtered[i],
+                    onTap: () => _showUserDetail(context, filtered[i]),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  // ── Services tab ───────────────────────────────────────────────────────────
+
+  Widget _servicesTab(AdminData data) => Column(
+    children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        child: Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Services',
+                style: TextStyle(
+                  color: _white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            _ActionBtn(
+              icon: Icons.add_rounded,
+              label: 'Add Service',
+              color: _orange,
+              onTap: () => _showServiceForm(context),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 12),
+      Expanded(
+        child: data.services.isEmpty
+            ? _emptyState(
+                icon: Icons.apps_outlined,
+                message: 'No services found.',
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                itemCount: data.services.length,
+                itemBuilder: (_, i) {
+                  final svc = data.services[i];
+                  return _ServiceCard(
+                    service: svc,
+                    onEdit: () => _showServiceForm(context, service: svc),
+                    onDelete: () => _confirmDelete(
+                      context,
+                      title: 'Delete service?',
+                      body: 'Remove "${svc.name}" from the platform?',
+                      onConfirm: () => context.read<AdminBloc>().add(
+                        AdminServiceDeleteRequested(svc.id),
+                      ),
+                    ),
+                  );
+                },
+              ),
+      ),
+    ],
+  );
+
+  // ── Search / filter ────────────────────────────────────────────────────────
+
+  Widget _searchField(String hint) => Container(
+    height: 48,
+    decoration: _adminDeco(_cyan, radius: 16),
+    child: TextField(
+      controller: _searchCtrl,
+      style: const TextStyle(color: _white, fontSize: 14),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(
+          color: _muted.withValues(alpha: 0.65),
+          fontSize: 13,
+        ),
+        prefixIcon: const Icon(Icons.search_rounded, color: _muted, size: 20),
+        border: InputBorder.none,
+        contentPadding: const EdgeInsets.symmetric(vertical: 13),
+      ),
+    ),
+  );
+
+  Widget _filterChip(String label, _UserFilter f) {
+    final selected = _filter == f;
     return GestureDetector(
-      onTap: () => setState(() => _filter = filter),
+      onTap: () => setState(() => _filter = f),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         margin: const EdgeInsets.only(right: 8),
@@ -748,417 +1030,805 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         decoration: BoxDecoration(
           color: selected ? _cyan.withValues(alpha: 0.12) : _card,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: selected ? _cyan.withValues(alpha: 0.45) : _white.withValues(alpha: 0.07)),
+          border: Border.all(
+            color: selected
+                ? _cyan.withValues(alpha: 0.45)
+                : _white.withValues(alpha: 0.07),
+          ),
         ),
-        child: Text(label, style: TextStyle(color: selected ? _cyan : _muted, fontSize: 12, fontWeight: FontWeight.w800)),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? _cyan : _muted,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
       ),
     );
   }
 
-  Widget _ratingSummary() => Container(
-        padding: const EdgeInsets.all(18),
-        decoration: _adminDecoration(_yellow, radius: 22, opacity: 0.18),
-        child: Row(
-          children: [
-            Column(
-              children: [
-                const Text('4.3', style: TextStyle(color: _white, fontSize: 42, fontWeight: FontWeight.w900)),
-                Row(children: List.generate(5, (i) => Icon(i < 4 ? Icons.star_rounded : Icons.star_half_rounded, color: _yellow, size: 18))),
-                const SizedBox(height: 4),
-                const Text('58 reviews', style: TextStyle(color: _muted, fontSize: 11)),
-              ],
-            ),
-            const SizedBox(width: 22),
-            Expanded(
-              child: Column(
-                children: [5, 4, 3, 2, 1].map((star) {
-                  const pcts = {5: 0.58, 4: 0.24, 3: 0.11, 2: 0.05, 1: 0.02};
-                  final pct = pcts[star]!;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(
-                      children: [
-                        Text('$star', style: const TextStyle(color: _muted, fontSize: 11)),
-                        const SizedBox(width: 7),
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: LinearProgressIndicator(value: pct, minHeight: 7, backgroundColor: _white.withValues(alpha: 0.06), valueColor: const AlwaysStoppedAnimation(_yellow)),
-                          ),
-                        ),
-                        const SizedBox(width: 7),
-                        Text('${(pct * 100).round()}%', style: const TextStyle(color: _muted, fontSize: 10)),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-          ],
-        ),
-      );
-
-  Widget _feedbackTile(_RecentFeedback feedback) => Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: _adminDecoration(_cyan, radius: 18, opacity: 0.07),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(child: Text(feedback.user, style: const TextStyle(color: _white, fontSize: 13, fontWeight: FontWeight.w900))),
-                Row(children: List.generate(5, (i) => Icon(i < feedback.rating ? Icons.star_rounded : Icons.star_outline_rounded, color: _yellow, size: 14))),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(feedback.comment, style: const TextStyle(color: _muted, fontSize: 12, height: 1.45)),
-            const SizedBox(height: 8),
-            Text(DateFormat('MMM d, yyyy').format(feedback.date), style: TextStyle(color: _muted.withValues(alpha: 0.60), fontSize: 10)),
-          ],
-        ),
-      );
-
-  Widget _miniInsight(String label, String value, Color color, IconData icon) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: _adminDecoration(color, radius: 18, opacity: 0.15),
-        child: Row(
-          children: [
-            Container(width: 34, height: 34, decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: color, size: 17)),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(value, style: TextStyle(color: color, fontSize: 17, fontWeight: FontWeight.w900)),
-                  Text(label, style: const TextStyle(color: _muted, fontSize: 10, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-
-  Widget _squareButton(IconData icon, Color color, VoidCallback onTap) => GestureDetector(
+  Widget _squareBtn(IconData icon, Color color, VoidCallback onTap) =>
+      GestureDetector(
         onTap: onTap,
         child: Container(
           width: 48,
           height: 48,
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(16), border: Border.all(color: color.withValues(alpha: 0.28))),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withValues(alpha: 0.28)),
+          ),
           child: Icon(icon, color: color, size: 20),
         ),
       );
 
-  Widget _periodSelector() => PopupMenuButton<String>(
-        color: _card,
-        initialValue: _reportPeriod,
-        onSelected: (value) => setState(() => _reportPeriod = value),
-        itemBuilder: (_) => ['This Month', '3 Months', 'Year'].map((period) => PopupMenuItem(value: period, child: Text(period, style: const TextStyle(color: _white)))).toList(),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          decoration: BoxDecoration(color: _field, borderRadius: BorderRadius.circular(12), border: Border.all(color: _white.withValues(alpha: 0.08))),
-          child: Row(
-            children: [
-              Text(_reportPeriod, style: const TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w800)),
-              const SizedBox(width: 5),
-              const Icon(Icons.keyboard_arrow_down_rounded, color: _muted, size: 16),
-            ],
-          ),
+  Widget _emptyState({required IconData icon, required String message}) =>
+      Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: _muted, size: 48),
+            const SizedBox(height: 12),
+            Text(message, style: const TextStyle(color: _muted, fontSize: 13)),
+          ],
         ),
       );
 
-  Widget _serviceAvatar(String icon, Color color) => Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: color.withValues(alpha: 0.12), border: Border.all(color: color.withValues(alpha: 0.35))),
-        child: Center(child: Text(icon, style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w900))),
-      );
+  // ── User detail / subscriptions sheets ────────────────────────────────────
 
-  void _showUserDetail(_AdminUser user) {
+  void _showUserDetail(BuildContext ctx, AdminUserModel user) {
     showModalBottomSheet(
-      context: context,
+      context: ctx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => BlocProvider.value(
+        value: ctx.read<AdminBloc>(),
+        child: _UserDetailSheet(
+          user: user,
+          onEdit: () {
+            Navigator.pop(ctx);
+            _showUserForm(ctx, user: user);
+          },
+          onToggle: () => _confirmAction(
+            ctx,
+            title: user.isActive ? 'Deactivate user?' : 'Activate user?',
+            body: user.isActive
+                ? 'Deactivating will prevent ${user.fullName} from logging in.'
+                : 'Activate ${user.fullName}\'s account?',
+            confirmLabel: user.isActive ? 'Deactivate' : 'Activate',
+            confirmColor: user.isActive ? _red : _green,
+            onConfirm: () {
+              Navigator.pop(ctx);
+              ctx.read<AdminBloc>().add(AdminUserToggleRequested(user.id));
+            },
+          ),
+          onResetPassword: () {
+            Navigator.pop(ctx);
+            _showResetPasswordSheet(ctx, user);
+          },
+          onDelete: () => _confirmDelete(
+            ctx,
+            title: 'Delete user?',
+            body: 'This will permanently remove ${user.fullName}.',
+            onConfirm: () {
+              Navigator.pop(ctx);
+              ctx.read<AdminBloc>().add(AdminUserDeleteRequested(user.id));
+            },
+          ),
+          onViewSubscriptions: () {
+            ctx.read<AdminBloc>().add(AdminUserSubscriptionsRequested(user.id));
+            _showUserSubscriptionsSheet(ctx, user);
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showUserSubscriptionsSheet(BuildContext ctx, AdminUserModel user) {
+    showModalBottomSheet(
+      context: ctx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => BlocProvider.value(
+        value: ctx.read<AdminBloc>(),
+        child: _UserSubscriptionsSheet(user: user),
+      ),
+    );
+  }
+
+  void _showResetPasswordSheet(BuildContext ctx, AdminUserModel user) {
+    final pwCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    showModalBottomSheet(
+      context: ctx,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _AdminSheet(
-        title: 'User Detail',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+        title: 'Reset Password',
+        child: Form(
+          key: formKey,
+          child: Column(
+            children: [
+              Text(
+                'Set a new password for ${user.fullName}.',
+                style: const TextStyle(color: _muted, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              _AdminTextField(
+                label: 'New Password',
+                icon: Icons.lock_outline_rounded,
+                controller: pwCtrl,
+                obscureText: true,
+                validator: (v) => (v == null || v.length < 6)
+                    ? 'Password must be at least 6 characters'
+                    : null,
+              ),
+              const SizedBox(height: 16),
+              _ActionBtn(
+                icon: Icons.lock_reset_rounded,
+                label: 'Reset Password',
+                color: _orange,
+                expanded: true,
+                onTap: () {
+                  if (!formKey.currentState!.validate()) return;
+                  Navigator.pop(ctx);
+                  ctx.read<AdminBloc>().add(
+                    AdminUserPasswordResetRequested(
+                      id: user.id,
+                      newPassword: pwCtrl.text.trim(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── User form ──────────────────────────────────────────────────────────────
+
+  void _showUserForm(BuildContext ctx, {AdminUserModel? user}) {
+    final firstCtrl = TextEditingController(text: user?.firstName ?? '');
+    final lastCtrl = TextEditingController(text: user?.lastName ?? '');
+    final emailCtrl = TextEditingController(text: user?.email ?? '');
+    final pwCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController(text: user?.phone ?? '');
+    String role = user?.role ?? 'user';
+    final formKey = GlobalKey<FormState>();
+
+    showModalBottomSheet(
+      context: ctx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (_, setSheet) => _AdminSheet(
+          title: user == null ? 'Add User' : 'Edit User',
+          child: Form(
+            key: formKey,
+            child: Column(
               children: [
-                _serviceAvatar(user.name[0], user.isActive ? _cyan : _muted),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(user.name, style: const TextStyle(color: _white, fontSize: 18, fontWeight: FontWeight.w900)),
-                      Text(user.email, style: const TextStyle(color: _muted, fontSize: 12)),
-                    ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: _AdminTextField(
+                        label: 'First Name',
+                        icon: Icons.person_rounded,
+                        controller: firstCtrl,
+                        validator: (v) =>
+                            (v == null || v.isEmpty) ? 'Required' : null,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _AdminTextField(
+                        label: 'Last Name',
+                        icon: Icons.person_rounded,
+                        controller: lastCtrl,
+                        validator: (v) =>
+                            (v == null || v.isEmpty) ? 'Required' : null,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _AdminTextField(
+                  label: 'Email',
+                  icon: Icons.email_rounded,
+                  controller: emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (v) => (v == null || !v.contains('@'))
+                      ? 'Valid email required'
+                      : null,
+                ),
+                if (user == null) ...[
+                  const SizedBox(height: 12),
+                  _AdminTextField(
+                    label: 'Password',
+                    icon: Icons.lock_outline_rounded,
+                    controller: pwCtrl,
+                    obscureText: true,
+                    validator: (v) =>
+                        (v == null || v.length < 6) ? 'Min 6 characters' : null,
+                  ),
+                ],
+                const SizedBox(height: 12),
+                _AdminTextField(
+                  label: 'Phone (optional)',
+                  icon: Icons.phone_rounded,
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _field,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _white.withValues(alpha: 0.07)),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: role,
+                      dropdownColor: _field,
+                      style: const TextStyle(color: _white, fontSize: 14),
+                      icon: const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: _muted,
+                      ),
+                      items: ['user', 'admin']
+                          .map(
+                            (r) => DropdownMenuItem(
+                              value: r,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    r == 'admin'
+                                        ? Icons.shield_rounded
+                                        : Icons.person_rounded,
+                                    color: r == 'admin' ? _orange : _cyan,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    r[0].toUpperCase() + r.substring(1),
+                                    style: const TextStyle(color: _white),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) => setSheet(() => role = v ?? role),
+                    ),
                   ),
                 ),
-                _statusPill(user.isActive ? 'Active' : 'Inactive', user.isActive ? _green : _muted),
+                const SizedBox(height: 16),
+                _ActionBtn(
+                  icon: user == null
+                      ? Icons.person_add_alt_1_rounded
+                      : Icons.save_rounded,
+                  label: user == null ? 'Create User' : 'Save Changes',
+                  color: _orange,
+                  expanded: true,
+                  onTap: () {
+                    if (!formKey.currentState!.validate()) return;
+                    Navigator.pop(sheetCtx);
+                    if (user == null) {
+                      ctx.read<AdminBloc>().add(
+                        AdminUserCreateRequested(
+                          firstName: firstCtrl.text.trim(),
+                          lastName: lastCtrl.text.trim(),
+                          email: emailCtrl.text.trim(),
+                          password: pwCtrl.text.trim(),
+                          role: role,
+                          phone: phoneCtrl.text.trim(),
+                        ),
+                      );
+                    } else {
+                      ctx.read<AdminBloc>().add(
+                        AdminUserUpdateRequested(
+                          id: user.id,
+                          firstName: firstCtrl.text.trim(),
+                          lastName: lastCtrl.text.trim(),
+                          email: emailCtrl.text.trim(),
+                          role: role,
+                          phone: phoneCtrl.text.trim(),
+                        ),
+                      );
+                    }
+                  },
+                ),
               ],
             ),
-            const SizedBox(height: 18),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                _infoPill('Role', user.role, _cyan),
-                _infoPill('Joined', DateFormat('MMM d, yyyy').format(user.joinedAt), _purple),
-                _infoPill('Subscriptions', '${user.subscriptions}', _green),
-                _infoPill('Monthly Spend', _currency.format(user.monthlySpend), _orange),
-              ],
-            ),
-            const SizedBox(height: 20),
-            const _AdminSectionTitle('Subscriptions'),
-            const SizedBox(height: 10),
-            ...user.subscriptionsList.map(_subscriptionTile),
-            const SizedBox(height: 18),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                _AdminActionButton(icon: Icons.edit_rounded, label: 'Edit User', color: _cyan, onTap: () => _mockMessage('Edit user opened')),
-                _AdminActionButton(icon: Icons.lock_reset_rounded, label: 'Reset Password', color: _orange, onTap: () => _mockMessage('Password reset sent')),
-                _AdminActionButton(icon: user.isActive ? Icons.block_rounded : Icons.check_circle_rounded, label: user.isActive ? 'Deactivate' : 'Activate', color: user.isActive ? _orange : _green, onTap: () => _mockMessage('Status updated')),
-                _AdminActionButton(icon: Icons.delete_rounded, label: 'Delete User', color: _red, onTap: () => _confirmDanger('Delete user?', 'This mock action would remove ${user.name}.')),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _subscriptionTile(_AdminSubscription sub) => Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: _field, borderRadius: BorderRadius.circular(16), border: Border.all(color: _white.withValues(alpha: 0.06))),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(sub.service, style: const TextStyle(color: _white, fontSize: 13, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 3),
-                Text('${sub.plan} - ${DateFormat('MMM d').format(sub.renewsAt)}', style: const TextStyle(color: _muted, fontSize: 11)),
-              ]),
-            ),
-            Text(_currency.format(sub.price), style: const TextStyle(color: _orange, fontSize: 12, fontWeight: FontWeight.w900)),
-            const SizedBox(width: 8),
-            _statusPill(sub.status, sub.status == 'Active' ? _green : _red),
-          ],
-        ),
-      );
+  // ── Service form ───────────────────────────────────────────────────────────
 
-  Widget _infoPill(String label, String value, Color color) => Container(
-        width: 142,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: color.withValues(alpha: 0.09), borderRadius: BorderRadius.circular(16), border: Border.all(color: color.withValues(alpha: 0.18))),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: const TextStyle(color: _muted, fontSize: 10, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 5),
-          Text(value, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w900), overflow: TextOverflow.ellipsis),
-        ]),
-      );
+  void _showServiceForm(BuildContext ctx, {AdminServiceModel? service}) {
+    final nameCtrl = TextEditingController(text: service?.name ?? '');
+    final amountCtrl = TextEditingController(
+      text: service != null ? service.defaultAmount.toStringAsFixed(2) : '',
+    );
+    final descCtrl = TextEditingController(text: service?.description ?? '');
+    final logoCtrl = TextEditingController(text: service?.logoUrl ?? '');
+    String cycle = service?.billingCycle.toLowerCase() ?? 'monthly';
+    final formKey = GlobalKey<FormState>();
 
-  void _showAddUserSheet() => showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => _AdminSheet(
-          title: 'Add User',
-          child: Column(
-            children: [
-              const _AdminTextField(label: 'Full name', icon: Icons.person_rounded),
-              const SizedBox(height: 12),
-              const _AdminTextField(label: 'Email address', icon: Icons.email_rounded),
-              const SizedBox(height: 12),
-              const _AdminTextField(label: 'Role', icon: Icons.badge_rounded),
-              const SizedBox(height: 16),
-              _AdminActionButton(icon: Icons.person_add_alt_1_rounded, label: 'Create User', color: _orange, expanded: true, onTap: () => _mockMessage('User created locally')),
-            ],
-          ),
-        ),
-      );
-
-  void _showServiceSheet({_AdminService? service}) => showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => _AdminSheet(
+    showModalBottomSheet(
+      context: ctx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (_, setSheet) => _AdminSheet(
           title: service == null ? 'Add Service' : 'Edit Service',
-          child: Column(
-            children: [
-              _AdminTextField(label: 'Service name', icon: Icons.apps_rounded, initialValue: service?.name),
-              const SizedBox(height: 12),
-              _AdminTextField(label: 'Category', icon: Icons.category_rounded, initialValue: service?.category),
-              const SizedBox(height: 12),
-              _AdminTextField(label: 'Price', icon: Icons.attach_money_rounded, initialValue: service?.price.toStringAsFixed(2)),
-              const SizedBox(height: 12),
-              _AdminTextField(label: 'Billing cycle', icon: Icons.calendar_month_rounded, initialValue: service?.cycle),
-              const SizedBox(height: 12),
-              _AdminTextField(label: 'Logo/Icon', icon: Icons.image_rounded, initialValue: service?.icon),
-              const SizedBox(height: 12),
-              _AdminTextField(label: 'Description', icon: Icons.description_rounded, initialValue: service?.description, maxLines: 3),
-              const SizedBox(height: 16),
-              _AdminActionButton(icon: Icons.save_rounded, label: service == null ? 'Create Service' : 'Save Service', color: _orange, expanded: true, onTap: () => _mockMessage('Service saved locally')),
-            ],
+          child: Form(
+            key: formKey,
+            child: Column(
+              children: [
+                _AdminTextField(
+                  label: 'Service Name',
+                  icon: Icons.apps_rounded,
+                  controller: nameCtrl,
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'Required' : null,
+                ),
+                const SizedBox(height: 12),
+                _AdminTextField(
+                  label: 'Default Amount (\$)',
+                  icon: Icons.attach_money_rounded,
+                  controller: amountCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d+\.?\d{0,2}'),
+                    ),
+                  ],
+                  validator: (v) => double.tryParse(v ?? '') == null
+                      ? 'Valid number required'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _field,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _white.withValues(alpha: 0.07)),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: cycle,
+                      dropdownColor: _field,
+                      style: const TextStyle(color: _white, fontSize: 14),
+                      icon: const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: _muted,
+                      ),
+                      items: ['monthly', 'weekly', 'yearly']
+                          .map(
+                            (c) => DropdownMenuItem(
+                              value: c,
+                              child: Text(
+                                c[0].toUpperCase() + c.substring(1),
+                                style: const TextStyle(color: _white),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) => setSheet(() => cycle = v ?? cycle),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _AdminTextField(
+                  label: 'Logo URL (optional)',
+                  icon: Icons.image_rounded,
+                  controller: logoCtrl,
+                ),
+                const SizedBox(height: 12),
+                _AdminTextField(
+                  label: 'Description',
+                  icon: Icons.description_rounded,
+                  controller: descCtrl,
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 16),
+                _ActionBtn(
+                  icon: service == null
+                      ? Icons.add_business_rounded
+                      : Icons.save_rounded,
+                  label: service == null ? 'Create Service' : 'Save Changes',
+                  color: _orange,
+                  expanded: true,
+                  onTap: () {
+                    if (!formKey.currentState!.validate()) return;
+                    Navigator.pop(sheetCtx);
+                    if (service == null) {
+                      ctx.read<AdminBloc>().add(
+                        AdminServiceCreateRequested(
+                          name: nameCtrl.text.trim(),
+                          defaultAmount: double.parse(amountCtrl.text.trim()),
+                          billingCycle: cycle,
+                          description: descCtrl.text.trim(),
+                          logoUrl: logoCtrl.text.trim(),
+                        ),
+                      );
+                    } else {
+                      ctx.read<AdminBloc>().add(
+                        AdminServiceUpdateRequested(
+                          id: service.id,
+                          name: nameCtrl.text.trim(),
+                          defaultAmount: double.parse(amountCtrl.text.trim()),
+                          billingCycle: cycle,
+                          description: descCtrl.text.trim(),
+                          logoUrl: logoCtrl.text.trim(),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
         ),
-      );
-
-  void _showNotificationSheet() => showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => _AdminSheet(
-          title: 'Send Push',
-          child: Column(
-            children: [
-              const _AdminTextField(label: 'Notification title', icon: Icons.title_rounded),
-              const SizedBox(height: 12),
-              const _AdminTextField(label: 'Message', icon: Icons.message_rounded, maxLines: 3),
-              const SizedBox(height: 12),
-              const _AdminTextField(label: 'Target audience', icon: Icons.groups_rounded, initialValue: 'All active users'),
-              const SizedBox(height: 16),
-              _AdminActionButton(icon: Icons.send_rounded, label: 'Send Notification', color: _orange, expanded: true, onTap: () => _mockMessage('Notification sent locally')),
-            ],
-          ),
-        ),
-      );
-
-  void _confirmDanger(String title, String message) {
-    showDialog<void>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: _card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22), side: BorderSide(color: _red.withValues(alpha: 0.24))),
-        title: Text(title, style: const TextStyle(color: _white, fontWeight: FontWeight.w900)),
-        content: Text(message, style: const TextStyle(color: _muted)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel', style: TextStyle(color: _muted))),
-          TextButton(onPressed: () { Navigator.pop(context); _mockMessage('Mock delete complete'); }, child: const Text('Delete', style: TextStyle(color: _red, fontWeight: FontWeight.w900))),
-        ],
       ),
     );
   }
 
-  void _mockMessage(String message) {
-    Navigator.maybePop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$message - backend pending'),
-        backgroundColor: _card,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+  // ── Dialogs ────────────────────────────────────────────────────────────────
+
+  void _confirmDelete(
+    BuildContext ctx, {
+    required String title,
+    required String body,
+    required VoidCallback onConfirm,
+  }) => _confirmAction(
+    ctx,
+    title: title,
+    body: body,
+    confirmLabel: 'Delete',
+    confirmColor: _red,
+    onConfirm: onConfirm,
+  );
+
+  void _confirmAction(
+    BuildContext ctx, {
+    required String title,
+    required String body,
+    required String confirmLabel,
+    required Color confirmColor,
+    required VoidCallback onConfirm,
+  }) => showDialog<void>(
+    context: ctx,
+    builder: (_) => AlertDialog(
+      backgroundColor: _card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+        side: BorderSide(color: confirmColor.withValues(alpha: 0.24)),
       ),
-    );
-  }
+      title: Text(
+        title,
+        style: const TextStyle(color: _white, fontWeight: FontWeight.w900),
+      ),
+      content: Text(body, style: const TextStyle(color: _muted)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Cancel', style: TextStyle(color: _muted)),
+        ),
+        TextButton(
+          onPressed: () {
+            Navigator.pop(ctx);
+            onConfirm();
+          },
+          child: Text(
+            confirmLabel,
+            style: TextStyle(color: confirmColor, fontWeight: FontWeight.w900),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
-class _AdminMetricCard extends StatelessWidget {
-  final String value;
-  final String label;
-  final IconData icon;
-  final Color color;
-  final String trend;
+// ── Profile stat card ─────────────────────────────────────────────────────────
 
-  const _AdminMetricCard({
+class _ProfileStatCard extends StatelessWidget {
+  const _ProfileStatCard({
     required this.value,
     required this.label,
     required this.icon,
     required this.color,
-    required this.trend,
   });
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color color;
 
   @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
-      padding: const EdgeInsets.all(14),
-      decoration: _adminDecoration(color, radius: 20, opacity: 0.16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(width: 34, height: 34, decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: color, size: 17)),
-          const Spacer(),
-          Text(value, style: TextStyle(color: color, fontSize: 21, fontWeight: FontWeight.w900), maxLines: 1),
-          const SizedBox(height: 3),
-          Text(label, style: const TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 3),
-          Text(trend, style: TextStyle(color: _muted.withValues(alpha: 0.65), fontSize: 9, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: _card,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: color.withValues(alpha: 0.18)),
+    ),
+    child: Column(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(height: 7),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: _muted,
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
-class _AdminHeroIcon extends StatelessWidget {
-  const _AdminHeroIcon();
+// ── Profile action ────────────────────────────────────────────────────────────
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: _cyan.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(11),
-      ),
-      child: const Icon(Icons.account_balance_wallet_rounded, color: _cyan, size: 20),
-    );
-  }
-}
-
-class _AdminChartCard extends StatelessWidget {
-  final String title;
+class _ProfileAction extends StatelessWidget {
+  const _ProfileAction({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
   final String subtitle;
-  final Widget child;
-
-  const _AdminChartCard({required this.title, required this.subtitle, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: _adminDecoration(_cyan, radius: 22, opacity: 0.12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(color: _white, fontSize: 15, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 3),
-          Text(subtitle, style: const TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 14),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _AdminUserCard extends StatelessWidget {
-  final _AdminUser user;
+  final Color color;
   final VoidCallback onTap;
 
-  const _AdminUserCard({required this.user, required this.onTap});
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(color: _muted, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: color.withValues(alpha: 0.50),
+            size: 20,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+// ── Access denied ─────────────────────────────────────────────────────────────
+
+class _AccessDeniedScreen extends StatelessWidget {
+  const _AccessDeniedScreen({required this.onBack});
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: _bg,
+    body: SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: _red.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: _red.withValues(alpha: 0.28)),
+                ),
+                child: const Icon(Icons.block_rounded, color: _red, size: 36),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Access Denied',
+                style: TextStyle(
+                  color: _white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'You do not have permission to access the admin panel.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: _muted, fontSize: 13, height: 1.5),
+              ),
+              const SizedBox(height: 28),
+              GestureDetector(
+                onTap: onBack,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 28,
+                    vertical: 13,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _cyan.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _cyan.withValues(alpha: 0.35)),
+                  ),
+                  child: const Text(
+                    'Go Back',
+                    style: TextStyle(color: _cyan, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+// ── Error view ────────────────────────────────────────────────────────────────
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.wifi_off_rounded, color: _muted, size: 48),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: _muted, fontSize: 13, height: 1.5),
+          ),
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: onRetry,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: _cyan.withValues(alpha: 0.65)),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.refresh_rounded, color: _cyan, size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'Retry',
+                    style: TextStyle(color: _cyan, fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+// ── Action loading overlay ────────────────────────────────────────────────────
+
+class _ActionLoadingOverlay extends StatelessWidget {
+  const _ActionLoadingOverlay();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    color: Colors.black.withValues(alpha: 0.45),
+    child: const Center(child: CircularProgressIndicator(color: _orange)),
+  );
+}
+
+// ── User card ─────────────────────────────────────────────────────────────────
+
+class _UserCard extends StatelessWidget {
+  const _UserCard({required this.user, required this.onTap});
+  final AdminUserModel user;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final color = user.isActive ? _cyan : _muted;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
-        decoration: _adminDecoration(user.isActive ? _cyan : _muted, radius: 18, opacity: 0.09),
+        decoration: _adminDeco(color, radius: 18),
         child: Row(
           children: [
             Container(
               width: 44,
               height: 44,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: (user.isActive ? _cyan : _muted).withValues(alpha: 0.12), border: Border.all(color: (user.isActive ? _cyan : _muted).withValues(alpha: 0.35))),
-              child: Center(child: Text(user.name[0], style: TextStyle(color: user.isActive ? _cyan : _muted, fontSize: 18, fontWeight: FontWeight.w900))),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color.withValues(alpha: 0.12),
+                border: Border.all(color: color.withValues(alpha: 0.35)),
+              ),
+              child: Center(
+                child: Text(
+                  user.initials,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -1167,26 +1837,53 @@ class _AdminUserCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Expanded(child: Text(user.name, style: const TextStyle(color: _white, fontSize: 13, fontWeight: FontWeight.w900), overflow: TextOverflow.ellipsis)),
-                      _statusPill(user.isActive ? 'Active' : 'Inactive', user.isActive ? _green : _muted),
+                      Expanded(
+                        child: Text(
+                          user.fullName,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: _white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      _statusPill(
+                        user.isActive ? 'Active' : 'Inactive',
+                        user.isActive ? _green : _muted,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 3),
-                  Text(user.email, style: const TextStyle(color: _muted, fontSize: 11), overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 7),
+                  Text(
+                    user.email,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: _muted, fontSize: 11),
+                  ),
+                  const SizedBox(height: 6),
                   Wrap(
                     spacing: 6,
-                    runSpacing: 6,
+                    runSpacing: 4,
                     children: [
-                      _smallBadge('${user.subscriptions} subs', _purple),
-                      _smallBadge('${_currency.format(user.monthlySpend)}/mo', _orange),
-                      _smallBadge('Joined ${DateFormat('MMM yy').format(user.joinedAt)}', _muted),
+                      _smallBadge(
+                        user.role,
+                        user.role == 'admin' ? _orange : _purple,
+                      ),
+                      if (user.createdAt != null)
+                        _smallBadge(
+                          'Joined ${DateFormat('MMM yy').format(user.createdAt!)}',
+                          _muted,
+                        ),
                     ],
                   ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: _white.withValues(alpha: 0.25), size: 20),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: _white.withValues(alpha: 0.25),
+              size: 20,
+            ),
           ],
         ),
       ),
@@ -1194,55 +1891,244 @@ class _AdminUserCard extends StatelessWidget {
   }
 }
 
-class _AdminServiceCard extends StatelessWidget {
-  final _AdminService service;
-  final VoidCallback onEdit;
-  final VoidCallback onToggle;
-  final VoidCallback onDelete;
+// ── User detail sheet ─────────────────────────────────────────────────────────
 
-  const _AdminServiceCard({
-    required this.service,
+class _UserDetailSheet extends StatelessWidget {
+  const _UserDetailSheet({
+    required this.user,
     required this.onEdit,
     required this.onToggle,
+    required this.onResetPassword,
     required this.onDelete,
+    required this.onViewSubscriptions,
   });
+  final AdminUserModel user;
+  final VoidCallback onEdit;
+  final VoidCallback onToggle;
+  final VoidCallback onResetPassword;
+  final VoidCallback onDelete;
+  final VoidCallback onViewSubscriptions;
+
+  @override
+  Widget build(BuildContext context) => _AdminSheet(
+    title: 'User Detail',
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: (user.isActive ? _cyan : _muted).withValues(alpha: 0.12),
+                border: Border.all(
+                  color: (user.isActive ? _cyan : _muted).withValues(
+                    alpha: 0.35,
+                  ),
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  user.initials,
+                  style: TextStyle(
+                    color: user.isActive ? _cyan : _muted,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user.fullName,
+                    style: const TextStyle(
+                      color: _white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    user.email,
+                    style: const TextStyle(color: _muted, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            _statusPill(
+              user.isActive ? 'Active' : 'Inactive',
+              user.isActive ? _green : _muted,
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            _infoPill('Role', user.role, _cyan),
+            if (user.createdAt != null)
+              _infoPill(
+                'Joined',
+                DateFormat('MMM d, yyyy').format(user.createdAt!),
+                _purple,
+              ),
+            if (user.phone != null && user.phone!.isNotEmpty)
+              _infoPill('Phone', user.phone!, _muted),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            _ActionBtn(
+              icon: Icons.edit_rounded,
+              label: 'Edit',
+              color: _cyan,
+              onTap: onEdit,
+            ),
+            _ActionBtn(
+              icon: user.isActive
+                  ? Icons.block_rounded
+                  : Icons.check_circle_rounded,
+              label: user.isActive ? 'Deactivate' : 'Activate',
+              color: user.isActive ? _red : _green,
+              onTap: onToggle,
+            ),
+            _ActionBtn(
+              icon: Icons.lock_reset_rounded,
+              label: 'Reset Password',
+              color: _orange,
+              onTap: onResetPassword,
+            ),
+            _ActionBtn(
+              icon: Icons.subscriptions_rounded,
+              label: 'Subscriptions',
+              color: _purple,
+              onTap: onViewSubscriptions,
+            ),
+            _ActionBtn(
+              icon: Icons.delete_rounded,
+              label: 'Delete',
+              color: _red,
+              onTap: onDelete,
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+// ── User subscriptions sheet ──────────────────────────────────────────────────
+
+class _UserSubscriptionsSheet extends StatelessWidget {
+  const _UserSubscriptionsSheet({required this.user});
+  final AdminUserModel user;
+
+  @override
+  Widget build(BuildContext context) => _AdminSheet(
+    title: '${user.fullName}\'s Subscriptions',
+    child: BlocBuilder<AdminBloc, AdminState>(
+      builder: (_, state) {
+        if (state is! AdminData) return const SizedBox.shrink();
+        if (state.subscriptionsLoading) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: Center(child: CircularProgressIndicator(color: _cyan)),
+          );
+        }
+        final subs = state.viewingUserSubscriptions;
+        if (subs.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: Center(
+              child: Text(
+                'No subscriptions found.',
+                style: TextStyle(color: _muted, fontSize: 13),
+              ),
+            ),
+          );
+        }
+        return Column(children: subs.map((s) => _SubTile(sub: s)).toList());
+      },
+    ),
+  );
+}
+
+class _SubTile extends StatelessWidget {
+  const _SubTile({required this.sub});
+  final AdminUserSubscriptionModel sub;
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = service.isActive ? _green : _muted;
+    final color = sub.isActive ? _green : _muted;
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: _adminDecoration(service.isActive ? _cyan : _muted, radius: 20, opacity: 0.10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(13),
+      decoration: _adminDeco(color, radius: 16),
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(width: 44, height: 44, decoration: BoxDecoration(shape: BoxShape.circle, color: _cyan.withValues(alpha: 0.12), border: Border.all(color: _cyan.withValues(alpha: 0.28))), child: Center(child: Text(service.icon, style: const TextStyle(color: _cyan, fontSize: 18, fontWeight: FontWeight.w900)))),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(service.name, style: const TextStyle(color: _white, fontSize: 14, fontWeight: FontWeight.w900), overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 3),
-                  Text('${service.category} - ${service.cycle}', style: const TextStyle(color: _muted, fontSize: 11), overflow: TextOverflow.ellipsis),
-                ]),
-              ),
-              _statusPill(service.isActive ? 'Active' : 'Inactive', statusColor),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  sub.serviceName,
+                  style: const TextStyle(
+                    color: _white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${sub.plan} · ${sub.billingCycle}',
+                  style: const TextStyle(color: _muted, fontSize: 11),
+                ),
+                if (sub.renewalDate != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Renews ${DateFormat('MMM d, yyyy').format(sub.renewalDate!)}',
+                    style: TextStyle(
+                      color: _muted.withValues(alpha: 0.7),
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+                if (sub.cardInfo != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Card: ${sub.cardInfo}',
+                    style: TextStyle(
+                      color: _muted.withValues(alpha: 0.7),
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          Text(service.description, style: const TextStyle(color: _muted, fontSize: 12, height: 1.4)),
-          const SizedBox(height: 12),
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _smallBadge('${_currency.format(service.price)}/mo', _orange),
-              const SizedBox(width: 7),
-              _smallBadge('${service.activeSubscribers} active', _cyan),
-              const Spacer(),
-              _iconAction(Icons.edit_rounded, _cyan, onEdit),
-              _iconAction(service.isActive ? Icons.pause_circle_rounded : Icons.play_circle_rounded, _orange, onToggle),
-              _iconAction(Icons.delete_rounded, _red, onDelete),
+              Text(
+                '\$${sub.amount.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  color: _orange,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              _statusPill(sub.status, color),
             ],
           ),
         ],
@@ -1251,180 +2137,760 @@ class _AdminServiceCard extends StatelessWidget {
   }
 }
 
-class _AdminActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  final bool expanded;
+// ── Service card ──────────────────────────────────────────────────────────────
 
-  const _AdminActionButton({
+class _ServiceCard extends StatelessWidget {
+  const _ServiceCard({
+    required this.service,
+    required this.onEdit,
+    required this.onDelete,
+  });
+  final AdminServiceModel service;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.all(14),
+    decoration: _adminDeco(_cyan, radius: 20),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _cyan.withValues(alpha: 0.12),
+                border: Border.all(color: _cyan.withValues(alpha: 0.28)),
+              ),
+              child: Center(
+                child:
+                    service.logoUrl != null &&
+                        service.logoUrl!.startsWith('http')
+                    ? ClipOval(
+                        child: Image.network(
+                          service.logoUrl!,
+                          width: 28,
+                          height: 28,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Text(
+                            service.initials,
+                            style: const TextStyle(
+                              color: _cyan,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Text(
+                        service.initials,
+                        style: const TextStyle(
+                          color: _cyan,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    service.name,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    [
+                      if (service.categoryName.isNotEmpty) service.categoryName,
+                      service.billingCycle,
+                    ].join(' · '),
+                    style: const TextStyle(color: _muted, fontSize: 11),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (service.description.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text(
+            service.description,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: _muted, fontSize: 12, height: 1.4),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            _smallBadge(
+              '\$${service.defaultAmount.toStringAsFixed(2)}/${service.billingCycle.toLowerCase()}',
+              _orange,
+            ),
+            const Spacer(),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit_rounded, color: _cyan, size: 19),
+            ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_rounded, color: _red, size: 19),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+// ── Metric card ───────────────────────────────────────────────────────────────
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
+    required this.value,
+    required this.label,
+    required this.icon,
+    required this.color,
+    this.sub = '',
+  });
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color color;
+  final String sub;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: _adminDeco(color, radius: 20),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: color, size: 17),
+        ),
+        const Spacer(),
+        Text(
+          value,
+          maxLines: 1,
+          style: TextStyle(
+            color: color,
+            fontSize: 21,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          label,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: _muted,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        if (sub.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(
+            sub,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: _muted.withValues(alpha: 0.65),
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+// ── Section title ─────────────────────────────────────────────────────────────
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.title);
+  final String title;
+  @override
+  Widget build(BuildContext context) => Text(
+    title,
+    style: const TextStyle(
+      color: _white,
+      fontSize: 15,
+      fontWeight: FontWeight.w900,
+    ),
+  );
+}
+
+// ── Bottom sheet wrapper ──────────────────────────────────────────────────────
+
+class _AdminSheet extends StatelessWidget {
+  const _AdminSheet({required this.title, required this.child});
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => DraggableScrollableSheet(
+    initialChildSize: 0.78,
+    minChildSize: 0.45,
+    maxChildSize: 0.94,
+    builder: (_, ctrl) => Container(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        10,
+        16,
+        16 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      decoration: const BoxDecoration(
+        color: _bg,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: ListView(
+        controller: ctrl,
+        children: [
+          Center(
+            child: Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: _white.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: _white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close_rounded, color: _muted),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    ),
+  );
+}
+
+// ── Action button ─────────────────────────────────────────────────────────────
+
+class _ActionBtn extends StatelessWidget {
+  const _ActionBtn({
     required this.icon,
     required this.label,
     required this.color,
     required this.onTap,
     this.expanded = false,
   });
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  final bool expanded;
 
   @override
   Widget build(BuildContext context) {
-    final button = GestureDetector(
+    final btn = GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(color: color.withValues(alpha: 0.11), borderRadius: BorderRadius.circular(16), border: Border.all(color: color.withValues(alpha: 0.28))),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.11),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withValues(alpha: 0.28)),
+        ),
         child: Row(
           mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, color: color, size: 16),
             const SizedBox(width: 7),
-            Flexible(child: Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w900), overflow: TextOverflow.ellipsis)),
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
-    return expanded ? SizedBox(width: double.infinity, child: button) : button;
+    return expanded ? SizedBox(width: double.infinity, child: btn) : btn;
   }
 }
 
-class _AdminActivityTile extends StatelessWidget {
-  final _ActivityEvent event;
+// ── Text field ────────────────────────────────────────────────────────────────
 
-  const _AdminActivityTile({required this.event});
+class _AdminTextField extends StatelessWidget {
+  const _AdminTextField({
+    required this.label,
+    required this.icon,
+    this.controller,
+    this.obscureText = false,
+    this.maxLines = 1,
+    this.keyboardType,
+    this.inputFormatters,
+    this.validator,
+  });
+  final String label;
+  final IconData icon;
+  final TextEditingController? controller;
+  final bool obscureText;
+  final int maxLines;
+  final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
+  final String? Function(String?)? validator;
+
+  @override
+  Widget build(BuildContext context) => TextFormField(
+    controller: controller,
+    obscureText: obscureText,
+    maxLines: maxLines,
+    keyboardType: keyboardType,
+    inputFormatters: inputFormatters,
+    validator: validator,
+    style: const TextStyle(color: _white, fontSize: 14),
+    decoration: InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: _muted, fontSize: 12),
+      prefixIcon: Icon(icon, color: _cyan, size: 19),
+      filled: true,
+      fillColor: _field,
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: _white.withValues(alpha: 0.07)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: _cyan.withValues(alpha: 0.42)),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: _red.withValues(alpha: 0.55)),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: _red),
+      ),
+    ),
+  );
+}
+
+// ── Revenue line chart ────────────────────────────────────────────────────────
+
+class _RevenueLineChart extends StatelessWidget {
+  const _RevenueLineChart();
+
+  static const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+  static const _data = [3200.0, 4800.0, 4100.0, 5600.0, 4900.0, 6800.0];
 
   @override
   Widget build(BuildContext context) {
+    final spots = List.generate(
+      _data.length,
+      (i) => FlSpot(i.toDouble(), _data[i]),
+    );
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(13),
-      decoration: _adminDecoration(event.color, radius: 18, opacity: 0.08),
+      height: 196,
+      padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF070F1A),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: _cyan.withValues(alpha: 0.20), width: 1.0),
+        boxShadow: [
+          BoxShadow(
+            color: _cyan.withValues(alpha: 0.08),
+            blurRadius: 30,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: LineChart(
+        LineChartData(
+          minY: 0,
+          maxY: 9000,
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: 3000,
+            getDrawingHorizontalLine: (_) => FlLine(
+              color: _white.withValues(alpha: 0.05),
+              strokeWidth: 1,
+            ),
+          ),
+          borderData: FlBorderData(show: false),
+          titlesData: FlTitlesData(
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 44,
+                interval: 3000,
+                getTitlesWidget: (v, _) => Text(
+                  '\$${(v / 1000).toStringAsFixed(0)}k',
+                  style: TextStyle(
+                    color: _muted.withValues(alpha: 0.60),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 24,
+                getTitlesWidget: (v, _) {
+                  final i = v.toInt();
+                  if (i < 0 || i >= _months.length) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      _months[i],
+                      style: TextStyle(
+                        color: _muted.withValues(alpha: 0.60),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          lineBarsData: [
+            LineChartBarData(
+              spots: spots,
+              isCurved: true,
+              curveSmoothness: 0.35,
+              color: _cyan,
+              barWidth: 2.5,
+              isStrokeCapRound: true,
+              dotData: FlDotData(
+                show: true,
+                getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
+                  radius: 3.5,
+                  color: _cyan,
+                  strokeWidth: 2,
+                  strokeColor: const Color(0xFF070F1A),
+                ),
+              ),
+              belowBarData: BarAreaData(
+                show: true,
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    _cyan.withValues(alpha: 0.18),
+                    _cyan.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Status donut chart ────────────────────────────────────────────────────────
+
+class _StatusDonutChart extends StatelessWidget {
+  const _StatusDonutChart({required this.stats});
+  final AdminStatisticsModel? stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = stats?.totalSubscriptions ?? 100;
+    final active = stats?.activeSubscriptions ?? 68;
+    final cancelled = (total - active).clamp(0, total);
+    final activePct = total > 0 ? active / total * 100 : 68.0;
+    final cancelledPct = total > 0 ? cancelled / total * 100 : 32.0;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF070F1A),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: _cyan.withValues(alpha: 0.20), width: 1.0),
+        boxShadow: [
+          BoxShadow(
+            color: _cyan.withValues(alpha: 0.08),
+            blurRadius: 30,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
       child: Row(
         children: [
-          Container(width: 36, height: 36, decoration: BoxDecoration(color: event.color.withValues(alpha: 0.13), borderRadius: BorderRadius.circular(12)), child: Icon(event.icon, color: event.color, size: 17)),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(event.title, style: const TextStyle(color: _white, fontSize: 13, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 3),
-              Text(event.detail, style: const TextStyle(color: _muted, fontSize: 11), overflow: TextOverflow.ellipsis),
-            ]),
+          SizedBox(
+            width: 130,
+            height: 130,
+            child: PieChart(
+              PieChartData(
+                sectionsSpace: 3,
+                centerSpaceRadius: 40,
+                startDegreeOffset: -90,
+                sections: [
+                  PieChartSectionData(
+                    value: activePct,
+                    color: _green,
+                    title: '${activePct.toStringAsFixed(0)}%',
+                    radius: 26,
+                    titleStyle: const TextStyle(
+                      color: _white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  PieChartSectionData(
+                    value: cancelledPct,
+                    color: _orange.withValues(alpha: 0.75),
+                    title: '${cancelledPct.toStringAsFixed(0)}%',
+                    radius: 22,
+                    titleStyle: const TextStyle(
+                      color: _white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-          Text(_relativeTime(event.date), style: TextStyle(color: _muted.withValues(alpha: 0.65), fontSize: 10, fontWeight: FontWeight.w700)),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _DonutLegend(
+                  color: _green,
+                  label: 'Active',
+                  value: '$active',
+                  pct: activePct,
+                ),
+                const SizedBox(height: 16),
+                _DonutLegend(
+                  color: _orange,
+                  label: 'Cancelled',
+                  value: '$cancelled',
+                  pct: cancelledPct,
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  '$total total subscriptions',
+                  style: TextStyle(
+                    color: _muted.withValues(alpha: 0.55),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _AdminSectionTitle extends StatelessWidget {
-  final String title;
-
-  const _AdminSectionTitle(this.title);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(title, style: const TextStyle(color: _white, fontSize: 15, fontWeight: FontWeight.w900));
-  }
-}
-
-class _AdminSheet extends StatelessWidget {
-  final String title;
-  final Widget child;
-
-  const _AdminSheet({required this.title, required this.child});
+class _DonutLegend extends StatelessWidget {
+  const _DonutLegend({
+    required this.color,
+    required this.label,
+    required this.value,
+    required this.pct,
+  });
+  final Color color;
+  final String label;
+  final String value;
+  final double pct;
 
   @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.78,
-      minChildSize: 0.45,
-      maxChildSize: 0.94,
-      builder: (_, controller) => Container(
-        padding: EdgeInsets.fromLTRB(16, 10, 16, 16 + MediaQuery.of(context).viewInsets.bottom),
-        decoration: const BoxDecoration(color: _bg, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-        child: ListView(
-          controller: controller,
-          children: [
-            Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: _white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(99)))),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(child: Text(title, style: const TextStyle(color: _white, fontSize: 20, fontWeight: FontWeight.w900))),
-                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: _muted)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            child,
-          ],
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.only(top: 3),
+        child: Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.45),
+                blurRadius: 6,
+              ),
+            ],
+          ),
         ),
       ),
-    );
-  }
-}
-
-class _AdminTextField extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final String? initialValue;
-  final int maxLines;
-
-  const _AdminTextField({required this.label, required this.icon, this.initialValue, this.maxLines = 1});
-
-  @override
-  Widget build(BuildContext context) {
-    return TextFormField(
-      initialValue: initialValue,
-      maxLines: maxLines,
-      style: const TextStyle(color: _white, fontSize: 14),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: _muted, fontSize: 12),
-        prefixIcon: Icon(icon, color: _cyan, size: 19),
-        filled: true,
-        fillColor: _field,
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: _white.withValues(alpha: 0.07))),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: _cyan.withValues(alpha: 0.42))),
+      const SizedBox(width: 9),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: _muted,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '$value  (${pct.toStringAsFixed(0)}%)',
+            style: TextStyle(
+              color: color,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
       ),
-    );
-  }
+    ],
+  );
 }
 
-BoxDecoration _adminDecoration(Color color, {double radius = 18, double opacity = 0.14}) => BoxDecoration(
-      color: _card,
-      borderRadius: BorderRadius.circular(radius),
-      border: Border.all(color: color.withValues(alpha: opacity)),
-      boxShadow: [BoxShadow(color: color.withValues(alpha: 0.045), blurRadius: 22, offset: const Offset(0, 12))],
-    );
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+BoxDecoration _adminDeco(Color color, {double radius = 18}) => BoxDecoration(
+  color: const Color(0xFF070F1A),
+  borderRadius: BorderRadius.circular(radius),
+  border: Border.all(color: color.withValues(alpha: 0.20), width: 1.0),
+  boxShadow: [
+    BoxShadow(
+      color: color.withValues(alpha: 0.08),
+      blurRadius: 28,
+      offset: const Offset(0, 10),
+    ),
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.22),
+      blurRadius: 8,
+      offset: const Offset(0, 4),
+    ),
+  ],
+);
 
 Widget _statusPill(String label, Color color) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999), border: Border.all(color: color.withValues(alpha: 0.18))),
-      child: Text(label, style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w900)),
-    );
+  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+  decoration: BoxDecoration(
+    color: color.withValues(alpha: 0.12),
+    borderRadius: BorderRadius.circular(999),
+    border: Border.all(color: color.withValues(alpha: 0.18)),
+  ),
+  child: Text(
+    label,
+    style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w900),
+  ),
+);
 
 Widget _smallBadge(String label, Color color) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(9)),
-      child: Text(label, style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w900)),
-    );
+  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+  decoration: BoxDecoration(
+    color: color.withValues(alpha: 0.10),
+    borderRadius: BorderRadius.circular(9),
+  ),
+  child: Text(
+    label,
+    style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w900),
+  ),
+);
 
 Widget _trendPill(String label, Color color) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999), border: Border.all(color: color.withValues(alpha: 0.20))),
-      child: Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w900)),
-    );
+  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+  decoration: BoxDecoration(
+    color: color.withValues(alpha: 0.12),
+    borderRadius: BorderRadius.circular(999),
+    border: Border.all(color: color.withValues(alpha: 0.20)),
+  ),
+  child: Text(
+    label,
+    style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w900),
+  ),
+);
 
-Widget _iconAction(IconData icon, Color color, VoidCallback onTap) => IconButton(
-      visualDensity: VisualDensity.compact,
-      onPressed: onTap,
-      icon: Icon(icon, color: color, size: 19),
-    );
-
-String _relativeTime(DateTime date) {
-  final diff = DateTime.now().difference(date);
-  if (diff.inMinutes < 60) return '${diff.inMinutes}m';
-  if (diff.inHours < 24) return '${diff.inHours}h';
-  return '${diff.inDays}d';
-}
-
+Widget _infoPill(String label, String value, Color color) => Container(
+  constraints: const BoxConstraints(minWidth: 100, maxWidth: 180),
+  padding: const EdgeInsets.all(12),
+  decoration: BoxDecoration(
+    color: color.withValues(alpha: 0.09),
+    borderRadius: BorderRadius.circular(16),
+    border: Border.all(color: color.withValues(alpha: 0.18)),
+  ),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: const TextStyle(
+          color: _muted,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      const SizedBox(height: 5),
+      Text(
+        value,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: color,
+          fontSize: 13,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    ],
+  ),
+);

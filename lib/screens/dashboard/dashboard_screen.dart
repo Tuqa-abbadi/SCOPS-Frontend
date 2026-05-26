@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
+import '../../blocs/reviews/reviews_bloc.dart';
 import '../../blocs/subscription/subscription_bloc.dart';
 import '../../blocs/wallet/wallet_bloc.dart';
 import '../services/services_browser_screen.dart';
 import '../wallet/wallet_screen.dart';
 import '../profile/profile_screen.dart';
 import '../subscription/edit_subscription_screen.dart';
+import '../subscription/subscriptions_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -26,6 +28,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   late Animation<double> _chartAnim;
   late AnimationController _navCtrl;
   late Animation<double> _navAnim;
+  String? _subsInitialFilter;
 
   static const _bg            = Color(0xFF0D0F12);
   static const _cyan          = Color(0xFF1DD8E8);
@@ -38,6 +41,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   static const _navItems = [
     _NavDestination(Icons.home_rounded, Icons.home_outlined, 'Home', 0),
     _NavDestination(Icons.grid_view_rounded, Icons.grid_view_outlined, 'Services', 1),
+    _NavDestination(Icons.receipt_long_rounded, Icons.receipt_long_outlined, 'Subscriptions', 2),
     _NavDestination(Icons.account_balance_wallet_rounded,
         Icons.account_balance_wallet_outlined, 'Wallet', 3),
     _NavDestination(Icons.person_rounded, Icons.person_outline_rounded, 'Profile', 4),
@@ -127,6 +131,16 @@ class _DashboardScreenState extends State<DashboardScreen>
     _navAnim = CurvedAnimation(parent: _navCtrl, curve: Curves.easeInOutCubic);
     _chartCtrl.forward();
     _navCtrl.value = 1;
+
+    final walletBloc = context.read<WalletBloc>();
+    if (walletBloc.state is WalletInitial) {
+      walletBloc.add(const WalletLoaded());
+    }
+
+    final subscriptionBloc = context.read<SubscriptionBloc>();
+    if (subscriptionBloc.state is SubscriptionInitial) {
+      subscriptionBloc.add(const SubscriptionLoaded());
+    }
   }
 
   @override
@@ -145,6 +159,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           providers: [
             BlocProvider.value(value: context.read<SubscriptionBloc>()),
             BlocProvider.value(value: context.read<WalletBloc>()),
+            BlocProvider.value(value: context.read<ReviewsBloc>()),
           ],
           child: EditSubscriptionScreen(subscription: sub),
         ),
@@ -158,6 +173,17 @@ class _DashboardScreenState extends State<DashboardScreen>
       _navFromIndex = _currentIndex;
       _navToIndex = index;
       _currentIndex = index;
+      if (index == 2) _subsInitialFilter = null; // direct tap = no pre-filter
+    });
+    _navCtrl.forward(from: 0);
+  }
+
+  void _goToSubscriptions([String? filter]) {
+    setState(() {
+      _subsInitialFilter = filter;
+      _navFromIndex = _currentIndex;
+      _navToIndex = 2;
+      _currentIndex = 2;
     });
     _navCtrl.forward(from: 0);
   }
@@ -174,8 +200,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       child: Icon(icon, color: _textPrimary, size: 22)));
 
   Widget _summaryCard({required String value, required String label,
-      required IconData icon, required Color iconColor, required Color glowColor}) {
-    return Expanded(child: Stack(children: [
+      required IconData icon, required Color iconColor, required Color glowColor,
+      VoidCallback? onTap}) {
+    return Expanded(child: GestureDetector(onTap: onTap, child: Stack(children: [
       Container(height: 140,
         decoration: BoxDecoration(
           color: const Color(0xFF080C10),
@@ -197,10 +224,12 @@ class _DashboardScreenState extends State<DashboardScreen>
           const SizedBox(height: 3),
           Text(label, style: const TextStyle(color: _textSecondary, fontSize: 12, fontWeight: FontWeight.w500)),
         ]))),
-    ]));
+    ])));
   }
 
-  Widget _activeSubsCard(int count) => Container(
+  Widget _activeSubsCard(int count, {VoidCallback? onTap}) => GestureDetector(
+    onTap: onTap,
+    child: Container(
     width: double.infinity,
     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
     decoration: BoxDecoration(
@@ -219,13 +248,13 @@ class _DashboardScreenState extends State<DashboardScreen>
         Text('$count', style: const TextStyle(
             color: Color(0xFF0D1A1C), fontSize: 42, fontWeight: FontWeight.w900, height: 1)),
         const SizedBox(height: 10),
-        const Text('Tap any subscription to manage it',
+        const Text('Tap to view all active subscriptions',
             style: TextStyle(color: Color(0xFF0D1A1C), fontWeight: FontWeight.w700, fontSize: 12)),
       ])),
       Container(width: 60, height: 60,
         decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
         child: const Icon(Icons.subscriptions_rounded, color: Color(0xFF0D1A1C), size: 28)),
-    ]));
+    ])));
 
   // ── Donut chart ────────────────────────────────────────────────────────────
   Widget _donutChart(List<SubscriptionModel> subs) {
@@ -511,10 +540,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                   icon: Icons.payments_rounded, iconColor: _cyan, glowColor: _cyan),
               const SizedBox(width: 14),
               _summaryCard(value: '$dueSoon', label: 'Due Soon',
-                  icon: Icons.calendar_month_rounded, iconColor: _orange, glowColor: _orange),
+                  icon: Icons.calendar_month_rounded, iconColor: _orange, glowColor: _orange,
+                  onTap: () => _goToSubscriptions('due_soon')),
             ]),
             const SizedBox(height: 18),
-            _activeSubsCard(activeSubs.length),
+            _activeSubsCard(activeSubs.length,
+                onTap: () => _goToSubscriptions('active')),
             const SizedBox(height: 18),
             if (activeSubs.isNotEmpty) ...[
               _donutChart(activeSubs),
@@ -713,6 +744,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget _currentPage() {
     switch (_currentIndex) {
       case 1: return const ServicesBrowserScreen();
+      case 2: return SubscriptionsScreen(initialFilter: _subsInitialFilter);
       case 3: return const WalletScreen();
       case 4: return const ProfileScreen();
       default: return _homeTab();

@@ -22,7 +22,9 @@ class CardModel extends Equatable {
         nickname: json['card_holder_name'] as String? ??
             json['nickname'] as String? ??
             '',
-        maskedPan: json['card_number'] as String? ??
+        // Backend may return last4 (Stripe) or a full masked pan
+        maskedPan: json['last4'] as String? ??
+            json['card_number'] as String? ??
             json['masked_pan'] as String? ??
             json['maskedPan'] as String? ??
             '',
@@ -30,7 +32,9 @@ class CardModel extends Equatable {
             json['expiry'] as String? ??
             _expiryFromParts(json) ??
             '',
-        type: json['card_brand'] as String? ??
+        // Backend may return Stripe brand ("visa", "mastercard") or legacy type
+        type: json['brand'] as String? ??
+            json['card_brand'] as String? ??
             json['type'] as String? ??
             'Visa',
         isPrimary: _parsePrimary(json),
@@ -39,7 +43,11 @@ class CardModel extends Equatable {
   static bool _parsePrimary(Map<String, dynamic> json) {
     final v = json['is_primary'] ?? json['isPrimary'];
     if (v is bool) return v;
-    if (v is String) return v.toLowerCase() == 'yes' || v == '1' || v.toLowerCase() == 'true';
+    if (v is String) {
+      return v.toLowerCase() == 'yes' ||
+          v == '1' ||
+          v.toLowerCase() == 'true';
+    }
     if (v is int) return v == 1;
     return false;
   }

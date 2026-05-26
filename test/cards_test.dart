@@ -41,11 +41,9 @@ class _FakeCardsApi extends CardsApiService {
   final dynamic onSetPrimary;  // Response<dynamic> or DioException
 
   @override
-  Future<Response<dynamic>> addCard({
+  Future<Response<dynamic>> saveStripeCard({
+    required String paymentMethodId,
     required String cardHolderName,
-    required String cardNumber,
-    required int expiryMonth,
-    required int expiryYear,
   }) async {
     if (onAdd is DioException) throw onAdd as DioException;
     return onAdd as Response<dynamic>;
@@ -73,11 +71,9 @@ class _FakeCardsRepository extends CardsRepository {
   final CardsResult _result;
 
   @override
-  Future<CardsResult> addCard({
+  Future<CardsResult> saveStripeCard({
+    required String paymentMethodId,
     required String cardHolderName,
-    required String cardNumber,
-    required int expiryMonth,
-    required int expiryYear,
   }) async =>
       _result;
 
@@ -163,7 +159,7 @@ void main() {
 
   // ── CardsRepository ────────────────────────────────────────────────────────
 
-  group('CardsRepository.addCard', () {
+  group('CardsRepository.saveStripeCard', () {
     test('success — returns updated card list after add', () async {
       final api = _FakeCardsApi(
         onAdd: _okResponse(null),
@@ -171,11 +167,9 @@ void main() {
       );
       final repo = CardsRepository(service: api);
 
-      final result = await repo.addCard(
+      final result = await repo.saveStripeCard(
+        paymentMethodId: 'pm_test_123',
         cardHolderName: 'Tuqa Dowikat',
-        cardNumber: '4111111111111111',
-        expiryMonth: 12,
-        expiryYear: 2027,
       );
 
       expect(result.success, isTrue);
@@ -192,11 +186,9 @@ void main() {
       );
       final repo = CardsRepository(service: api);
 
-      final result = await repo.addCard(
+      final result = await repo.saveStripeCard(
+        paymentMethodId: 'pm_test_123',
         cardHolderName: 'Tuqa Dowikat',
-        cardNumber: '4111111111111111',
-        expiryMonth: 12,
-        expiryYear: 2027,
       );
 
       expect(result.success, isTrue);
@@ -213,11 +205,9 @@ void main() {
       );
       final repo = CardsRepository(service: api);
 
-      final result = await repo.addCard(
+      final result = await repo.saveStripeCard(
+        paymentMethodId: 'pm_test_bad',
         cardHolderName: 'Tuqa Dowikat',
-        cardNumber: '0000',
-        expiryMonth: 1,
-        expiryYear: 2025,
       );
 
       expect(result.success, isFalse);
@@ -231,11 +221,9 @@ void main() {
       );
       final repo = CardsRepository(service: api);
 
-      final result = await repo.addCard(
+      final result = await repo.saveStripeCard(
+        paymentMethodId: 'pm_test_123',
         cardHolderName: 'Tuqa Dowikat',
-        cardNumber: '4111111111111111',
-        expiryMonth: 12,
-        expiryYear: 2027,
       );
 
       expect(result.success, isFalse);
@@ -249,11 +237,9 @@ void main() {
       );
       final repo = CardsRepository(service: api);
 
-      final result = await repo.addCard(
+      final result = await repo.saveStripeCard(
+        paymentMethodId: 'pm_test_123',
         cardHolderName: 'Tuqa Dowikat',
-        cardNumber: '4111111111111111',
-        expiryMonth: 12,
-        expiryYear: 2027,
       );
 
       expect(result.success, isFalse);
@@ -264,11 +250,9 @@ void main() {
   // ── WalletBloc ─────────────────────────────────────────────────────────────
 
   group('WalletBloc — WalletCardAdded', () {
-    const addEvent = WalletCardAdded(
+    const addEvent = WalletStripeCardSaved(
+      paymentMethodId: 'pm_test_123',
       cardHolderName: 'Tuqa Dowikat',
-      cardNumber: '4111111111111111',
-      expiryMonth: 12,
-      expiryYear: 2027,
     );
 
     test('emits WalletData with new card on success', () async {

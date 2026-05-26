@@ -10,19 +10,23 @@ class WalletLoaded extends WalletEvent {
   const WalletLoaded();
 }
 
-class WalletCardAdded extends WalletEvent {
-  final String cardHolderName;
-  final String cardNumber;
-  final int expiryMonth;
-  final int expiryYear;
-  const WalletCardAdded({
+/// Step 1 — request a SetupIntent from the backend.
+class WalletSetupIntentRequested extends WalletEvent {
+  const WalletSetupIntentRequested();
+}
+
+/// Step 2 — Stripe PaymentSheet confirmed; send payment method to backend.
+class WalletStripeCardSaved extends WalletEvent {
+  const WalletStripeCardSaved({
+    required this.paymentMethodId,
     required this.cardHolderName,
-    required this.cardNumber,
-    required this.expiryMonth,
-    required this.expiryYear,
   });
+
+  final String paymentMethodId;
+  final String cardHolderName;
+
   @override
-  List<Object> get props => [cardNumber];
+  List<Object> get props => [paymentMethodId, cardHolderName];
 }
 
 class WalletCardDeleted extends WalletEvent {

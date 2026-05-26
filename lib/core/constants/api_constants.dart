@@ -1,7 +1,7 @@
 import '../config/app_config.dart';
 
 class ApiConstants {
-  static String get baseUrl => AppConfig.apiBaseUrl;
+  static const String baseUrl = AppConfig.apiBaseUrl;
 
   static const String login = 'logIn';
   static const String register = 'register';
@@ -33,4 +33,25 @@ class ApiConstants {
   static String subscriptionPause(int id) => 'subscriptions/$id/pause';
   static String subscriptionResume(int id) => 'subscriptions/$id/resume';
   static String subscriptionRenewal(int id) => 'subscriptions/$id/renewal';
+
+  // Payments
+  static String createPaymentIntent(int serviceId) => 'payments/$serviceId';
+  static String confirmPayment(int paymentId) => 'payments/confirm/$paymentId';
+
+  // Cards – Stripe SetupIntent
+  static const String cardsSetupIntent = 'cards/setup-intent';
+
+  // Reviews
+  static const String reviews = 'reviews';
+  static String reviewsForService(int serviceId) => 'reviews/$serviceId';
+
+  // Admin
+  static const String adminStatistics = 'admin/statistics';
+  static const String adminUsers = 'admin/users';
+  static String adminUserById(String id) => 'admin/users/$id';
+  static String adminUserToggle(String id) => 'admin/users/$id/toggle';
+  static String adminUserResetPassword(String id) => 'admin/users/$id/reset-password';
+  static String adminUserSubscriptions(String id) => 'admin/users/$id/subscriptions';
+  static const String adminServices = 'admin/services';
+  static String adminServiceById(int id) => 'admin/services/$id';
 }

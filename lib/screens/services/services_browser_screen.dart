@@ -1,10 +1,12 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../blocs/payment/payment_bloc.dart';
+import '../../blocs/reviews/reviews_bloc.dart';
 import '../../blocs/services/services_bloc.dart';
 import '../../blocs/subscription/subscription_bloc.dart';
 import '../../blocs/wallet/wallet_bloc.dart';
-import '../subscription/add_subscription_screen.dart';
+import '../reviews/write_review_sheet.dart';
 
 // ── Billing cycle label helpers ───────────────────────────────────────────────
 
@@ -465,19 +467,11 @@ class _ServicesBrowserScreenState extends State<ServicesBrowserScreen> {
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
-      itemCount: loaded.filteredServices.length + 1,
-      itemBuilder: (context, i) {
-        if (i == loaded.filteredServices.length) {
-          return GestureDetector(
-            onTap: _openManualAdd,
-            child: _manualCard(),
-          );
-        }
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 14),
-          child: _serviceCard(loaded.filteredServices[i]),
-        );
-      },
+      itemCount: loaded.filteredServices.length,
+      itemBuilder: (context, i) => Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: _serviceCard(loaded.filteredServices[i]),
+      ),
     );
   }
 
@@ -598,94 +592,7 @@ class _ServicesBrowserScreenState extends State<ServicesBrowserScreen> {
     );
   }
 
-  // ── Manual-add card ───────────────────────────────────────────────────────
-  Widget _manualCard() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 10, 0, 22),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: _card,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _cyan.withValues(alpha: 0.65)),
-          boxShadow: [
-            BoxShadow(
-                color: _cyan.withValues(alpha: 0.12),
-                blurRadius: 20,
-                spreadRadius: -4),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: _cyan.withValues(alpha: 0.75)),
-              ),
-              child: const Icon(Icons.add, color: _cyan, size: 30),
-            ),
-            const SizedBox(width: 16),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Can't find your service?",
-                    style: TextStyle(
-                        color: _white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900),
-                  ),
-                  SizedBox(height: 5),
-                  Text(
-                    'Add any subscription manually\nin just a few taps.',
-                    style: TextStyle(color: _muted, fontSize: 13, height: 1.35),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _cyan.withValues(alpha: 0.85)),
-              ),
-              child: const Row(
-                children: [
-                  Text('Add Manually',
-                      style: TextStyle(
-                          color: _cyan,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 14)),
-                  SizedBox(width: 10),
-                  Icon(Icons.arrow_forward_rounded, color: _cyan, size: 22),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // ── Navigation helpers ────────────────────────────────────────────────────
-  void _openManualAdd() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => MultiBlocProvider(
-          providers: [
-            BlocProvider.value(value: context.read<SubscriptionBloc>()),
-            BlocProvider.value(value: context.read<WalletBloc>()),
-          ],
-          child: const AddSubscriptionScreen(),
-        ),
-      ),
-    );
-  }
 
   void _showDetail(BuildContext context, ServiceModel svc) {
     showModalBottomSheet(
@@ -697,6 +604,8 @@ class _ServicesBrowserScreenState extends State<ServicesBrowserScreen> {
           BlocProvider.value(value: context.read<ServicesBloc>()),
           BlocProvider.value(value: context.read<SubscriptionBloc>()),
           BlocProvider.value(value: context.read<WalletBloc>()),
+          BlocProvider.value(value: context.read<ReviewsBloc>()),
+          BlocProvider.value(value: context.read<PaymentBloc>()),
         ],
         child: _DetailSheet(svc: svc),
       ),
@@ -745,29 +654,152 @@ class _DetailSheetState extends State<_DetailSheet> {
   static const _white  = Colors.white;
   static const _muted  = Color(0xFF9BA4B0);
 
+  int? get _serviceIdInt => int.tryParse(widget.svc.id);
+
   @override
   void initState() {
     super.initState();
-    // Trigger fetch of full service details (including plans) from the API.
-    context
-        .read<ServicesBloc>()
-        .add(ServiceDetailRequested(widget.svc.id));
+    context.read<ServicesBloc>().add(ServiceDetailRequested(widget.svc.id));
+    final sid = _serviceIdInt;
+    if (sid != null) {
+      context.read<ReviewsBloc>().add(ReviewsForServiceRequested(sid));
+    }
+  }
+
+  @override
+  void dispose() {
+    context.read<PaymentBloc>().add(const PaymentReset());
+    super.dispose();
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
 
+  // ── Payment confirmation dialog ────────────────────────────────────────────
+
+  Future<void> _showConfirmDialog(
+      BuildContext context, PaymentIntentReady state) async {
+    final bloc = context.read<PaymentBloc>();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: _card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Confirm Payment',
+          style: TextStyle(
+              color: _white, fontWeight: FontWeight.w900, fontSize: 18),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'You are about to pay for ${widget.svc.name}.',
+              style: const TextStyle(color: _muted, fontSize: 14, height: 1.5),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: _cyan.withValues(alpha: 0.07),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _cyan.withValues(alpha: 0.25)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.receipt_long_outlined,
+                      color: _cyan, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Payment ID: ${state.paymentId}',
+                    style: const TextStyle(
+                        color: _cyan,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Do you want to confirm this payment?',
+              style: TextStyle(color: _muted, fontSize: 13, height: 1.4),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('No',
+                style: TextStyle(color: _muted, fontWeight: FontWeight.w700)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _cyan,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Yes, Pay',
+                style: TextStyle(fontWeight: FontWeight.w900)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      bloc.add(PaymentConfirmed(state.paymentId));
+    } else {
+      bloc.add(const PaymentDeclined());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final svc = widget.svc;
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.88,
-      ),
-      decoration: const BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      child: Column(
+    return BlocListener<PaymentBloc, PaymentState>(
+      listener: (context, state) {
+        if (state is PaymentIntentReady) {
+          _showConfirmDialog(context, state);
+        } else if (state is PaymentSuccess) {
+          // Capture messenger before pop — context is deactivated after pop.
+          final messenger = ScaffoldMessenger.of(context);
+          Navigator.of(context).pop();
+          messenger.showSnackBar(
+            SnackBar(
+              content: const Text('Payment confirmed successfully!'),
+              backgroundColor: _cyan.withValues(alpha: 0.90),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+        } else if (state is PaymentFailure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: _orange.withValues(alpha: 0.90),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+          context.read<PaymentBloc>().add(const PaymentReset());
+        }
+      },
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
+        decoration: const BoxDecoration(
+          color: _card,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // ── Fixed header ─────────────────────────────────────────────────
@@ -806,6 +838,33 @@ class _DetailSheetState extends State<_DetailSheet> {
                         _buildPlansSection(context, state),
                   ),
 
+                  const SizedBox(height: 28),
+
+                  // ── Reviews section ──────────────────────────────────────
+                  const Text(
+                    'Reviews',
+                    style: TextStyle(
+                      color: _white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  BlocBuilder<ReviewsBloc, ReviewsState>(
+                    builder: (context, state) =>
+                        _buildReviewsSection(context, state),
+                  ),
+
+                  // ── Write review (if eligible) ───────────────────────────
+                  const SizedBox(height: 8),
+                  BlocBuilder<ReviewsBloc, ReviewsState>(
+                    builder: (context, reviewState) =>
+                        BlocBuilder<SubscriptionBloc, SubscriptionState>(
+                      builder: (context, subState) =>
+                          _buildWriteReviewButton(context, subState, reviewState),
+                    ),
+                  ),
+
                   const SizedBox(height: 24),
                 ],
               ),
@@ -823,6 +882,7 @@ class _DetailSheetState extends State<_DetailSheet> {
             child: _buildCtaButton(context),
           ),
         ],
+        ),
       ),
     );
   }
@@ -1178,55 +1238,294 @@ class _DetailSheetState extends State<_DetailSheet> {
     );
   }
 
-  // ── CTA button ────────────────────────────────────────────────────────────
+  // ── Reviews section ───────────────────────────────────────────────────────
 
-  Widget _buildCtaButton(BuildContext context) {
-    return Container(
-      height: 56,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFF7A1F), Color(0xFFFF5A14)],
+  Widget _buildReviewsSection(BuildContext context, ReviewsState state) {
+    if (state is! ReviewsData) {
+      return const Center(
+        child: SizedBox(
+          width: 24, height: 24,
+          child: CircularProgressIndicator(color: _cyan, strokeWidth: 2.5),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFFF5A14).withValues(alpha: 0.35),
-            blurRadius: 22,
-            offset: const Offset(0, 10),
+      );
+    }
+
+    final sid = _serviceIdInt;
+
+    if (state.detailLoading && state.detailServiceId == sid) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 16),
+          child: SizedBox(
+            width: 24, height: 24,
+            child: CircularProgressIndicator(color: _cyan, strokeWidth: 2.5),
+          ),
+        ),
+      );
+    }
+
+    if (state.detailError != null && state.detailServiceId == sid) {
+      return _reviewsError(context, state.detailError!);
+    }
+
+    final reviews = state.detailServiceId == sid ? state.detailReviews : const [];
+
+    if (reviews.isEmpty) {
+      return _reviewsEmpty();
+    }
+
+    return Column(
+      children: reviews
+          .map((r) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _reviewCard(r),
+              ))
+          .toList(),
+    );
+  }
+
+  Widget _reviewsEmpty() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.rate_review_outlined,
+              color: _muted.withValues(alpha: 0.55), size: 20),
+          const SizedBox(width: 12),
+          Text('No reviews yet. Be the first!',
+              style: TextStyle(
+                  color: _muted.withValues(alpha: 0.80), fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
+  Widget _reviewsError(BuildContext context, String error) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: _orange.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _orange.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline_rounded,
+              color: _orange.withValues(alpha: 0.80), size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(error,
+                style: TextStyle(
+                    color: _muted.withValues(alpha: 0.90),
+                    fontSize: 13,
+                    height: 1.4)),
+          ),
+          GestureDetector(
+            onTap: () {
+              final sid = _serviceIdInt;
+              if (sid != null) {
+                context.read<ReviewsBloc>().add(ReviewsForServiceRequested(sid));
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.only(left: 12),
+              child: Text('Retry',
+                  style: TextStyle(
+                      color: _cyan,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13)),
+            ),
           ),
         ],
       ),
-      child: ElevatedButton(
-        onPressed: () {
-          Navigator.pop(context);
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => MultiBlocProvider(
-                providers: [
-                  BlocProvider.value(
-                      value: context.read<SubscriptionBloc>()),
-                  BlocProvider.value(value: context.read<WalletBloc>()),
-                ],
-                child: AddSubscriptionScreen(
-                    preSelectedService: widget.svc),
-              ),
-            ),
-          );
-        },
-        style: ElevatedButton.styleFrom(
+    );
+  }
+
+  Widget _reviewCard(dynamic r) {
+    final rating    = r.rating as int;
+    final comment   = r.comment as String?;
+    final createdAt = r.createdAt as DateTime?;
+    final dateStr   = createdAt != null
+        ? '${createdAt.day}/${createdAt.month}/${createdAt.year}'
+        : '';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            ...List.generate(5, (i) {
+              final filled = i < (rating / 2).round();
+              return Icon(
+                filled ? Icons.star_rounded : Icons.star_outline_rounded,
+                color: const Color(0xFFFFB020),
+                size: 15,
+              );
+            }),
+            const Spacer(),
+            if (dateStr.isNotEmpty)
+              Text(dateStr,
+                  style: TextStyle(
+                      color: _muted.withValues(alpha: 0.65), fontSize: 11)),
+          ]),
+          if (comment != null && comment.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(comment,
+                style: const TextStyle(
+                    color: _white, fontSize: 13, height: 1.45)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ── Write review button (shown only when user has an eligible subscription) ─
+
+  Widget _buildWriteReviewButton(
+    BuildContext context,
+    SubscriptionState subState,
+    ReviewsState reviewState,
+  ) {
+    if (subState is! SubscriptionData) return const SizedBox.shrink();
+    if (reviewState is! ReviewsData) return const SizedBox.shrink();
+
+    final sid = _serviceIdInt;
+    if (sid == null) return const SizedBox.shrink();
+
+    SubscriptionModel? eligible;
+    for (final sub in subState.subscriptions) {
+      if (sub.serviceId != sid) continue;
+      if (!sub.isActive) continue;
+      final startDate = sub.startDate;
+      if (startDate == null) continue;
+      final days = DateTime.now().difference(startDate).inDays;
+      final hasRenewed = sub.nextRenewal.isBefore(DateTime.now());
+      if (days < 7 && !hasRenewed) continue;
+      if (reviewState.hasReviewForSubscription(sub.apiId)) continue;
+      eligible = sub;
+      break;
+    }
+
+    if (eligible == null) return const SizedBox.shrink();
+
+    final sub = eligible;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: GestureDetector(
+        onTap: () => showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
           backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          foregroundColor: Colors.black,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16)),
+          builder: (_) => BlocProvider.value(
+            value: context.read<ReviewsBloc>(),
+            child: WriteReviewSheet(subscription: sub, serviceId: sid),
+          ),
         ),
-        child: const Text(
-          'Add Subscription',
-          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFB020).withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+                color: const Color(0xFFFFB020).withValues(alpha: 0.35)),
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.star_outline_rounded,
+                  color: Color(0xFFFFB020), size: 18),
+              SizedBox(width: 8),
+              Text(
+                'Write a Review',
+                style: TextStyle(
+                  color: Color(0xFFFFB020),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  // ── CTA button ────────────────────────────────────────────────────────────
+
+  Widget _buildCtaButton(BuildContext context) {
+    return BlocBuilder<PaymentBloc, PaymentState>(
+      builder: (context, paymentState) {
+        final isLoading = paymentState is PaymentIntentLoading ||
+            paymentState is PaymentConfirming;
+
+        return Container(
+          height: 56,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              colors: isLoading
+                  ? [
+                      const Color(0xFFFF7A1F).withValues(alpha: 0.55),
+                      const Color(0xFFFF5A14).withValues(alpha: 0.55),
+                    ]
+                  : const [Color(0xFFFF7A1F), Color(0xFFFF5A14)],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFFF5A14).withValues(alpha: 0.35),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: ElevatedButton(
+            onPressed: isLoading
+                ? null
+                : () {
+                    final sid = _serviceIdInt;
+                    if (sid != null) {
+                      context
+                          .read<PaymentBloc>()
+                          .add(PaymentIntentRequested(sid));
+                    }
+                  },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              foregroundColor: Colors.black,
+              disabledBackgroundColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+            ),
+            child: isLoading
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      color: Colors.black,
+                      strokeWidth: 2.5,
+                    ),
+                  )
+                : const Text(
+                    'Add Subscription',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                  ),
+          ),
+        );
+      },
     );
   }
 }

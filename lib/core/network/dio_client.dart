@@ -43,11 +43,7 @@ class DioClient {
     }());
 
     dio.interceptors.add(
-      AuthInterceptor(
-        tokenStorage: tokenStorage,
-        dio: dio,
-        baseUrl: baseUrl,
-      ),
+      AuthInterceptor(tokenStorage: tokenStorage, dio: dio, baseUrl: baseUrl),
     );
 
     client._dio = dio;
@@ -57,9 +53,9 @@ class DioClient {
   static BaseOptions _baseOptions(String baseUrl) {
     return BaseOptions(
       baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 60),
-      receiveTimeout: const Duration(seconds: 60),
-      sendTimeout: const Duration(seconds: 60),
+      connectTimeout: const Duration(seconds: 20),
+      receiveTimeout: const Duration(seconds: 20),
+      sendTimeout: const Duration(seconds: 20),
       headers: const {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
