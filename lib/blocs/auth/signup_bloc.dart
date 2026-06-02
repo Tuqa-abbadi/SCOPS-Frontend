@@ -80,8 +80,21 @@ class SignupBloc extends Bloc<AuthEvent, AuthState> {
       emit(current.copyWith(errorMessage: 'Please enter your email.'));
       return;
     }
-    if (event.phone.trim().isEmpty) {
+    final phoneDigits = event.phone.trim().replaceAll(RegExp(r'\D'), '');
+    final localPhoneDigits =
+        phoneDigits.startsWith('962') ? phoneDigits.substring(3) : phoneDigits;
+    final normalizedPhone = localPhoneDigits;
+
+    if (localPhoneDigits.isEmpty) {
       emit(current.copyWith(errorMessage: 'Please enter your phone number.'));
+      return;
+    }
+    if (!RegExp(r'^\d{10}$').hasMatch(localPhoneDigits)) {
+      emit(
+        current.copyWith(
+          errorMessage: 'Phone number must be 10 digits after +962.',
+        ),
+      );
       return;
     }
     if (event.password.isEmpty) {
@@ -103,12 +116,15 @@ class SignupBloc extends Bloc<AuthEvent, AuthState> {
       firstName: event.firstName.trim(),
       lastName: event.lastName.trim(),
       email: event.email.trim(),
-      phone: event.phone.trim(),
+      phone: normalizedPhone,
       password: event.password,
     );
 
     if (result.success) {
-      emit(const SignupSuccess());
+      emit(SignupSuccess(
+        email: event.email.trim(),
+        message: result.message,
+      ));
     } else {
       emit(
         current.copyWith(

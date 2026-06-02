@@ -1,12 +1,15 @@
-import 'dart:ui' as ui;
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
+import '../../blocs/analytics/analytics_model.dart';
+import '../../blocs/notification/notification_model.dart';
 import '../../blocs/reviews/reviews_bloc.dart';
 import '../../blocs/subscription/subscription_bloc.dart';
 import '../../blocs/wallet/wallet_bloc.dart';
+import '../../services/token_storage_service.dart';
+import '../analytics/spending_analytics_screen.dart';
+import '../notifications/notifications_screen.dart';
 import '../services/services_browser_screen.dart';
 import '../wallet/wallet_screen.dart';
 import '../profile/profile_screen.dart';
@@ -14,20 +17,23 @@ import '../subscription/edit_subscription_screen.dart';
 import '../subscription/subscriptions_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({
+    super.key,
+    this.initialIndex = 0,
+    this.showSubscriptionAddedMessage = false,
+    this.showAddCardAfterSignup = false,
+  });
+
+  final int initialIndex;
+  final bool showSubscriptionAddedMessage;
+  final bool showAddCardAfterSignup;
+
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen>
-    with TickerProviderStateMixin {
-  int _currentIndex = 0;
-  int _navFromIndex = 0;
-  int _navToIndex = 0;
-  late AnimationController _chartCtrl;
-  late Animation<double> _chartAnim;
-  late AnimationController _navCtrl;
-  late Animation<double> _navAnim;
+class _DashboardScreenState extends State<DashboardScreen> {
+  late int _currentIndex;
   String? _subsInitialFilter;
 
   static const _bg            = Color(0xFF0D0F12);
@@ -40,11 +46,10 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   static const _navItems = [
     _NavDestination(Icons.home_rounded, Icons.home_outlined, 'Home', 0),
-    _NavDestination(Icons.grid_view_rounded, Icons.grid_view_outlined, 'Services', 1),
-    _NavDestination(Icons.receipt_long_rounded, Icons.receipt_long_outlined, 'Subscriptions', 2),
+    _NavDestination(Icons.grid_view_rounded, Icons.grid_view_outlined, 'Subscriptions', 1),
     _NavDestination(Icons.account_balance_wallet_rounded,
-        Icons.account_balance_wallet_outlined, 'Wallet', 3),
-    _NavDestination(Icons.person_rounded, Icons.person_outline_rounded, 'Profile', 4),
+        Icons.account_balance_wallet_outlined, 'Wallet', 2),
+    _NavDestination(Icons.person_rounded, Icons.person_outline_rounded, 'Profile', 3),
   ];
 
   static const _catColors = <String, Color>{
@@ -59,20 +64,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     'Fitness': Color(0xFFF43F5E),
     'Finance': Color(0xFF14B8A6),
     'Other': Color(0xFF64748B),
-  };
-
-  static const _catIcons = <String, IconData>{
-    'Streaming': Icons.live_tv_rounded,
-    'Music': Icons.music_note_rounded,
-    'Work': Icons.work_rounded,
-    'Storage': Icons.cloud_rounded,
-    'Developer': Icons.code_rounded,
-    'Design': Icons.brush_rounded,
-    'AI': Icons.auto_awesome_rounded,
-    'Gaming': Icons.sports_esports_rounded,
-    'Fitness': Icons.fitness_center_rounded,
-    'Finance': Icons.account_balance_wallet_rounded,
-    'Other': Icons.category_rounded,
   };
 
   static String _guessCategory(String name) {
@@ -100,37 +91,107 @@ class _DashboardScreenState extends State<DashboardScreen>
     return 'Other';
   }
 
-  static List<_CategorySpend> _categoryBreakdown(List<SubscriptionModel> subs) {
-    final totals = <String, double>{};
-    final counts = <String, int>{};
+  static AnalyticsData _analyticsFromSubscriptions(List<SubscriptionModel> subs) {
+    final now = DateTime.now();
+    final monthStarts = List.generate(
+      6,
+      (index) => DateTime(now.year, now.month - (5 - index)),
+    );
 
+    final monthly = monthStarts.map((monthStart) {
+      final monthEnd = DateTime(
+        monthStart.year,
+        monthStart.month + 1,
+        0,
+        23,
+        59,
+        59,
+      );
+      final total = subs.where((sub) {
+        final startDate = sub.startDate;
+        return startDate == null || !startDate.isAfter(monthEnd);
+      }).fold(0.0, (sum, sub) => sum + _monthlyAmount(sub));
+
+      return MonthlySpend(DateFormat('MMM').format(monthStart), total);
+    }).toList();
+
+    final categories = _analyticsCategories(subs);
+    final totalThisMonth = monthly.isEmpty ? 0.0 : monthly.last.amount;
+    final totalLastMonth = monthly.length < 2 ? 0.0 : monthly[monthly.length - 2].amount;
+    final monthsWithSpend = monthly.where((month) => month.amount > 0).toList();
+    final avgMonthly = monthsWithSpend.isEmpty
+        ? 0.0
+        : monthsWithSpend.fold(0.0, (sum, month) => sum + month.amount) /
+            monthsWithSpend.length;
+
+    return AnalyticsData(
+      monthly: monthly,
+      byCategory: categories,
+      totalThisMonth: totalThisMonth,
+      totalLastMonth: totalLastMonth,
+      avgMonthly: avgMonthly,
+    );
+  }
+
+  static List<CategorySpend> _analyticsCategories(List<SubscriptionModel> subs) {
+    final totals = <String, double>{};
     for (final sub in subs) {
       final category = _guessCategory(sub.serviceName);
-      totals[category] = (totals[category] ?? 0) + sub.amount;
-      counts[category] = (counts[category] ?? 0) + 1;
+      totals[category] = (totals[category] ?? 0) + _monthlyAmount(sub);
     }
 
     final items = totals.entries
-        .map((entry) => _CategorySpend(
-              name: entry.key,
-              amount: entry.value,
-              count: counts[entry.key] ?? 0,
+        .map((entry) => CategorySpend(
+              entry.key,
+              entry.value,
+              _colorHex(_catColors[entry.key] ?? _catColors['Other']!),
             ))
         .toList()
       ..sort((a, b) => b.amount.compareTo(a.amount));
-
     return items;
   }
+
+  static double _monthlyAmount(SubscriptionModel sub) {
+    final cycle = sub.billingCycle.toLowerCase();
+    if (cycle.contains('year')) return sub.amount / 12;
+    if (cycle.contains('week')) return sub.amount * 52 / 12;
+    if (cycle.contains('day')) return sub.amount * 365 / 12;
+    return sub.amount;
+  }
+
+  static String _colorHex(Color color) =>
+      '#${color.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
 
   @override
   void initState() {
     super.initState();
-    _chartCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000));
-    _chartAnim = CurvedAnimation(parent: _chartCtrl, curve: Curves.easeOutCubic);
-    _navCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 680));
-    _navAnim = CurvedAnimation(parent: _navCtrl, curve: Curves.easeInOutCubic);
-    _chartCtrl.forward();
-    _navCtrl.value = 1;
+    _currentIndex = widget.initialIndex.clamp(0, _navItems.length - 1).toInt();
+
+    _loadInitialAuthenticatedData();
+
+    if (widget.showSubscriptionAddedMessage) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('Subscription added successfully!'),
+          backgroundColor: _cyan,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ));
+      });
+    }
+
+    if (widget.showAddCardAfterSignup) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _showAddCardAfterSignup();
+      });
+    }
+  }
+
+  Future<void> _loadInitialAuthenticatedData() async {
+    final hasAccessToken = await TokenStorageService().hasAccessToken();
+    if (!mounted || !hasAccessToken) return;
 
     final walletBloc = context.read<WalletBloc>();
     if (walletBloc.state is WalletInitial) {
@@ -145,8 +206,6 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   @override
   void dispose() {
-    _chartCtrl.dispose();
-    _navCtrl.dispose();
     super.dispose();
   }
 
@@ -170,34 +229,89 @@ class _DashboardScreenState extends State<DashboardScreen>
   void _selectNavIndex(int index) {
     if (_currentIndex == index) return;
     setState(() {
-      _navFromIndex = _currentIndex;
-      _navToIndex = index;
       _currentIndex = index;
-      if (index == 2) _subsInitialFilter = null; // direct tap = no pre-filter
+      if (index == 1) _subsInitialFilter = null; // direct tap = no pre-filter
     });
-    _navCtrl.forward(from: 0);
   }
 
   void _goToSubscriptions([String? filter]) {
     setState(() {
       _subsInitialFilter = filter;
-      _navFromIndex = _currentIndex;
-      _navToIndex = 2;
-      _currentIndex = 2;
+      _currentIndex = 1;
     });
-    _navCtrl.forward(from: 0);
+  }
+
+  void _openServicesPage() {
+    setState(() {
+      _currentIndex = 4;
+    });
+  }
+
+  void _openNotifications() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+    );
   }
 
   // ── Widgets ───────────────────────────────────────────────────────────────
-  Widget _iconBtn(IconData icon, {VoidCallback? onTap}) => GestureDetector(
+  void _showAddCardAfterSignup() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => BlocProvider.value(
+        value: context.read<WalletBloc>(),
+        child: const AddCardSheet(
+          title: 'Add your first card',
+          subtitle:
+              'Save a card now so future subscription payments are ready.',
+          successMessage: 'Card saved successfully.',
+          showSkip: true,
+        ),
+      ),
+    );
+  }
+
+  Widget _iconBtn(IconData icon, {VoidCallback? onTap, int badgeCount = 0}) {
+    final badgeText = badgeCount > 9 ? '9+' : '$badgeCount';
+
+    return GestureDetector(
     onTap: onTap,
-    child: Container(
-      width: 50, height: 50,
-      decoration: BoxDecoration(
-        color: const Color(0xFF181E26),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08))),
-      child: Icon(icon, color: _textPrimary, size: 22)));
+    child: Stack(clipBehavior: Clip.none, children: [
+      Container(
+        width: 50, height: 50,
+        decoration: BoxDecoration(
+          color: const Color(0xFF181E26),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08))),
+        child: Icon(icon, color: _textPrimary, size: 22)),
+      if (badgeCount > 0)
+        Positioned(
+          top: -5,
+          right: -5,
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 5),
+            decoration: BoxDecoration(
+              color: _orange,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: _bg, width: 2),
+            ),
+            child: Center(
+              child: Text(
+                badgeText,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+        ),
+    ]));
+  }
 
   Widget _summaryCard({required String value, required String label,
       required IconData icon, required Color iconColor, required Color glowColor,
@@ -257,139 +371,27 @@ class _DashboardScreenState extends State<DashboardScreen>
     ])));
 
   // ── Donut chart ────────────────────────────────────────────────────────────
-  Widget _donutChart(List<SubscriptionModel> subs) {
-    final categories = _categoryBreakdown(subs);
-    final total = categories.fold(0.0, (sum, item) => sum + item.amount);
-    final topCategory = categories.isNotEmpty ? categories.first : null;
+  // ── Renewal tile ───────────────────────────────────────────────────────────
+  Widget _subscriptionLogo(SubscriptionModel sub, {double size = 44}) {
+    final logo = sub.serviceLogoUrl;
+    final fallback = Center(
+      child: Text(sub.serviceIcon, style: const TextStyle(fontSize: 22)),
+    );
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-      decoration: BoxDecoration(
-        color: _cardBg,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.22),
-            blurRadius: 26,
-            offset: const Offset(0, 16),
-          ),
-        ],
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const Text('Spending by Category',
-              style: TextStyle(color: _textPrimary, fontSize: 15, fontWeight: FontWeight.w800)),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: _cyan.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _cyan.withValues(alpha: 0.20))),
-            child: const Text('This month',
-                style: TextStyle(color: _cyan, fontSize: 10, fontWeight: FontWeight.w700))),
-        ]),
-        const SizedBox(height: 18),
-        Row(children: [
-          SizedBox(width: 142, height: 142,
-            child: AnimatedBuilder(
-              animation: _chartAnim,
-              builder: (_, __) => CustomPaint(
-                painter: _DonutPainter(
-                  entries: categories,
-                  total: total,
-                  progress: _chartAnim.value,
-                  colorMap: _catColors,
-                  centerLabel: '\$${total.toStringAsFixed(0)}',
-                  centerSub: topCategory?.name ?? 'Total'),
-              ))),
-          const SizedBox(width: 18),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            if (topCategory != null) ...[
-              Text('Top category',
-                  style: TextStyle(
-                    color: _textSecondary.withValues(alpha: 0.8),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  )),
-              const SizedBox(height: 6),
-              Row(children: [
-                Icon(
-                  _catIcons[topCategory.name] ?? Icons.category_rounded,
-                  color: _catColors[topCategory.name] ?? const Color(0xFF64748B),
-                  size: 17,
-                ),
-                const SizedBox(width: 6),
-                Expanded(child: Text(topCategory.name,
-                    style: const TextStyle(
-                      color: _textPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                    ))),
-              ]),
-              const SizedBox(height: 12),
-            ],
-            ...categories.take(5).map((item) {
-              final color = _catColors[item.name] ?? const Color(0xFF64748B);
-              final pct = total > 0 ? item.amount / total : 0.0;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Column(children: [
-                  Row(children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: color.withValues(alpha: 0.22)),
-                      ),
-                      child: Icon(
-                        _catIcons[item.name] ?? Icons.category_rounded,
-                        color: color,
-                        size: 14,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(item.name,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: _textSecondary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ))),
-                    Text('\$${item.amount.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          color: color,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                        )),
-                    const SizedBox(width: 6),
-                    Text('${(pct * 100).toStringAsFixed(0)}%',
-                        style: TextStyle(
-                          color: _textSecondary.withValues(alpha: 0.58),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                        )),
-                  ]),
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: LinearProgressIndicator(
-                      minHeight: 3,
-                      value: pct,
-                      backgroundColor: Colors.white.withValues(alpha: 0.06),
-                      valueColor: AlwaysStoppedAnimation<Color>(color),
-                    ),
-                  ),
-                ]));
-            }),
-          ])),
-        ]),
-      ]));
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: logo != null && logo.isNotEmpty
+          ? Image.network(
+              logo,
+              width: size,
+              height: size,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => fallback,
+            )
+          : fallback,
+    );
   }
 
-  // ── Renewal tile ───────────────────────────────────────────────────────────
   Widget _renewalTile(SubscriptionModel s) {
     final daysLeft    = s.nextRenewal.difference(DateTime.now()).inDays;
     final isUrgent    = daysLeft <= 3 && s.isActive;
@@ -414,7 +416,8 @@ class _DashboardScreenState extends State<DashboardScreen>
               decoration: BoxDecoration(
                 color: isInactive ? badgeColor.withValues(alpha: 0.08) : const Color(0xFF1E2730),
                 borderRadius: BorderRadius.circular(14)),
-              child: Center(child: Text(s.serviceIcon, style: const TextStyle(fontSize: 22)))),
+              clipBehavior: Clip.antiAlias,
+              child: _subscriptionLogo(s)),
             if (isInactive)
               Positioned(top: -4, right: -4,
                 child: Container(width: 16, height: 16,
@@ -511,6 +514,10 @@ class _DashboardScreenState extends State<DashboardScreen>
         final totalSpend = activeSubs.fold(0.0, (sum, s) => sum + s.amount);
         final dueSoon    = activeSubs.where((s) => s.nextRenewal.difference(DateTime.now()).inDays <= 7).length;
         final upcoming   = [...allSubs]..sort((a, b) => a.nextRenewal.compareTo(b.nextRenewal));
+        final analytics = _analyticsFromSubscriptions(activeSubs);
+        final unreadNotifications = mockNotifications()
+            .where((n) => n.status == NotificationStatus.unread)
+            .length;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -524,7 +531,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                   errorBuilder: (_, __, ___) => const Text('scops',
                       style: TextStyle(color: _cyan, fontSize: 22, fontWeight: FontWeight.w900))),
               const Spacer(),
-              _iconBtn(Icons.notifications_none_rounded),
+              _iconBtn(
+                Icons.notifications_none_rounded,
+                onTap: _openNotifications,
+                badgeCount: unreadNotifications,
+              ),
               const SizedBox(width: 10),
               _iconBtn(Icons.search_rounded),
             ]),
@@ -547,10 +558,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             _activeSubsCard(activeSubs.length,
                 onTap: () => _goToSubscriptions('active')),
             const SizedBox(height: 18),
-            if (activeSubs.isNotEmpty) ...[
-              _donutChart(activeSubs),
-              const SizedBox(height: 28),
-            ],
+            SpendingAnalyticsView(data: analytics),
+            const SizedBox(height: 28),
             const Text('Upcoming Renewals',
                 style: TextStyle(color: _textPrimary, fontSize: 20, fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
@@ -580,115 +589,86 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   // ── Bottom nav ─────────────────────────────────────────────────────────────
   Widget _bottomNav() {
-    final activeSlot = _navItems.indexWhere((item) => item.index == _currentIndex);
-    final safeSlot = activeSlot < 0 ? 0 : activeSlot;
-    final activeItem = _navItems[safeSlot];
-
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
         child: SizedBox(
-          height: 86,
-          child: LayoutBuilder(builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            final slotWidth = width / _navItems.length;
-
-            double centerForIndex(int index) {
-              final slot = _navItems.indexWhere((item) => item.index == index);
-              final safe = slot < 0 ? 0 : slot;
-              return (slotWidth * safe) + (slotWidth / 2);
-            }
-
-            return AnimatedBuilder(
-              animation: _navAnim,
-              builder: (context, _) {
-                final t = _navAnim.value;
-                final fromCenter = centerForIndex(_navFromIndex);
-                final toCenter = centerForIndex(_navToIndex);
-                final circleCenter = ui.lerpDouble(fromCenter, toCenter, t)!;
-                final circleTop = 10 + (math.sin(t * math.pi) * 8);
-
-                return Stack(clipBehavior: Clip.none, children: [
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 4,
-                    height: 72,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(30),
-                        color: const Color(0xFF08111C).withValues(alpha: 0.96),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.38),
-                            blurRadius: 28,
-                            offset: const Offset(0, 14),
-                          ),
-                          BoxShadow(
-                            color: _cyan.withValues(alpha: 0.07),
-                            blurRadius: 18,
-                            offset: const Offset(0, -2),
-                          ),
-                        ],
+          height: 96,
+          child: Stack(clipBehavior: Clip.none, alignment: Alignment.topCenter, children: [
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 76,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  color: const Color(0xFF07111B).withValues(alpha: 0.98),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.42),
+                      blurRadius: 22,
+                      offset: const Offset(0, 12),
+                    ),
+                    BoxShadow(
+                      color: _cyan.withValues(alpha: 0.06),
+                      blurRadius: 16,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 2,
+              height: 72,
+              child: Row(children: [
+                Expanded(child: _navItem(_navItems[0])),
+                Expanded(child: _navItem(_navItems[1])),
+                const SizedBox(width: 74),
+                Expanded(child: _navItem(_navItems[2])),
+                Expanded(child: _navItem(_navItems[3])),
+              ]),
+            ),
+            Positioned(
+              top: 0,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _openServicesPage,
+                child: Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [_orangeLight, _orange],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _orange.withValues(alpha: 0.42),
+                        blurRadius: 22,
+                        spreadRadius: 1,
+                        offset: const Offset(0, 8),
                       ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 4,
-                    height: 72,
-                    child: Row(
-                      children: _navItems
-                          .map((item) => Expanded(child: _navItem(item)))
-                          .toList(),
-                    ),
-                  ),
-                  Positioned(
-                    left: circleCenter - 20,
-                    top: circleTop,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => _selectNavIndex(activeItem.index),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [_orangeLight, _orange],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: _orange.withValues(alpha: 0.32),
-                              blurRadius: 18,
-                              spreadRadius: 1,
-                              offset: const Offset(0, 8),
-                            ),
-                            BoxShadow(
-                              color: const Color(0xFF08111C).withValues(alpha: 0.90),
-                              blurRadius: 10,
-                              spreadRadius: -6,
-                              offset: const Offset(0, 9),
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          activeItem.activeIcon,
-                          color: Colors.white,
-                          size: 22,
-                        ),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        blurRadius: 16,
+                        offset: const Offset(0, 8),
                       ),
-                    ),
+                    ],
                   ),
-                ]);
-              },
-            );
-          }),
+                  child: const Icon(Icons.add_rounded, color: Colors.white, size: 36),
+                ),
+              ),
+            ),
+          ]),
         ),
       ),
     );
@@ -705,33 +685,27 @@ class _DashboardScreenState extends State<DashboardScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(
-                height: 40,
-                child: Center(
-                  child: AnimatedOpacity(
-                    opacity: isActive ? 0.0 : 1.0,
-                    duration: const Duration(milliseconds: 180),
-                    child: Icon(
-                      item.icon,
-                      size: 23,
-                      color: const Color(0xFF9BA4B0),
-                    ),
-                  ),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                child: Icon(
+                  isActive ? item.activeIcon : item.icon,
+                  key: ValueKey('${item.label}-$isActive'),
+                  size: 22,
+                  color: isActive ? _cyan : const Color(0xFF9BA4B0),
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 6),
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 180),
                 style: TextStyle(
-                  color: isActive ? _orangeLight : const Color(0xFF9BA4B0),
-                  fontSize: 10.5,
+                  color: isActive ? _cyan : const Color(0xFFDCE5EB),
+                  fontSize: 9.5,
                   height: 1.0,
                   fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
                 ),
-                child: Text(
-                  item.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(item.label, maxLines: 1),
                 ),
               ),
             ],
@@ -743,10 +717,10 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _currentPage() {
     switch (_currentIndex) {
-      case 1: return const ServicesBrowserScreen();
-      case 2: return SubscriptionsScreen(initialFilter: _subsInitialFilter);
-      case 3: return const WalletScreen();
-      case 4: return const ProfileScreen();
+      case 1: return SubscriptionsScreen(initialFilter: _subsInitialFilter);
+      case 2: return const WalletScreen();
+      case 3: return const ProfileScreen();
+      case 4: return const ServicesBrowserScreen();
       default: return _homeTab();
     }
   }
@@ -768,18 +742,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 }
 
-class _CategorySpend {
-  const _CategorySpend({
-    required this.name,
-    required this.amount,
-    required this.count,
-  });
-
-  final String name;
-  final double amount;
-  final int count;
-}
-
 class _NavDestination {
   const _NavDestination(this.activeIcon, this.icon, this.label, this.index);
 
@@ -790,58 +752,3 @@ class _NavDestination {
 }
 
 // ── Donut chart painter ───────────────────────────────────────────────────
-class _DonutPainter extends CustomPainter {
-  final List<_CategorySpend> entries;
-  final double total;
-  final double progress;
-  final Map<String, Color> colorMap;
-  final String centerLabel;
-  final String centerSub;
-
-  const _DonutPainter({
-    required this.entries, required this.total, required this.progress,
-    required this.colorMap, required this.centerLabel, required this.centerSub,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (total == 0) return;
-    final center    = size.center(Offset.zero);
-    final radius    = size.width / 2 - 4;
-    final thickness = radius * 0.40;
-    const gap       = 0.03;
-
-    double start = -math.pi / 2;
-    for (final e in entries) {
-      final sweep = (e.amount / total) * 2 * math.pi * progress;
-      final color = colorMap[e.name] ?? const Color(0xFF64748B);
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius - thickness / 2),
-        start + gap, (sweep - gap * 2).clamp(0.0, 2 * math.pi), false,
-        Paint()
-          ..color = color
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = thickness
-          ..strokeCap = StrokeCap.butt);
-      start += sweep;
-    }
-
-    if (progress > 0.6) {
-      final vp = ui.ParagraphBuilder(ui.ParagraphStyle(textAlign: TextAlign.center))
-        ..pushStyle(ui.TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900))
-        ..addText(centerLabel);
-      final vPara = vp.build()..layout(ui.ParagraphConstraints(width: size.width));
-      canvas.drawParagraph(vPara, Offset(center.dx - vPara.maxIntrinsicWidth / 2, center.dy - vPara.height - 2));
-
-      final sp = ui.ParagraphBuilder(ui.ParagraphStyle(textAlign: TextAlign.center))
-        ..pushStyle(ui.TextStyle(color: const Color(0xFF8A9BA8), fontSize: 9))
-        ..addText(centerSub);
-      final sPara = sp.build()..layout(ui.ParagraphConstraints(width: size.width));
-      canvas.drawParagraph(sPara, Offset(center.dx - sPara.maxIntrinsicWidth / 2, center.dy + 4));
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DonutPainter old) =>
-      old.progress != progress || old.centerLabel != centerLabel;
-}

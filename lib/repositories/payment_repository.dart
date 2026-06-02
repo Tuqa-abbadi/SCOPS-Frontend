@@ -20,10 +20,12 @@ class ConfirmPaymentResult {
   const ConfirmPaymentResult({
     required this.success,
     required this.message,
+    this.receipt,
   });
 
   final bool success;
   final String message;
+  final Map<String, dynamic>? receipt;
 }
 
 // ignore: avoid_print
@@ -35,9 +37,17 @@ class PaymentRepository {
 
   final PaymentApiService _service;
 
-  Future<PaymentIntentResult> createPaymentIntent(int serviceId) async {
+  Future<PaymentIntentResult> createPaymentIntent(
+    int serviceId, {
+    int? planId,
+    String? serviceAccountEmail,
+  }) async {
     try {
-      final response = await _service.createPaymentIntent(serviceId);
+      final response = await _service.createPaymentIntent(
+        serviceId,
+        planId: planId,
+        serviceAccountEmail: serviceAccountEmail,
+      );
       _log('Raw response: ${response.data}');
       final data = _extractData(response.data);
       _log('Extracted data: $data');
@@ -66,10 +76,12 @@ class PaymentRepository {
   }) async {
     try {
       _log('Confirm request — paymentId=$paymentId clientSecret=$clientSecret');
-      await _service.confirmPayment(paymentId, clientSecret: clientSecret);
-      return const ConfirmPaymentResult(
+      final response =
+          await _service.confirmPayment(paymentId, clientSecret: clientSecret);
+      return ConfirmPaymentResult(
         success: true,
         message: 'Payment confirmed successfully.',
+        receipt: _extractReceipt(response.data),
       );
     } on DioException catch (e) {
       return ConfirmPaymentResult(success: false, message: _dioError(e));
@@ -79,6 +91,24 @@ class PaymentRepository {
         message: 'Failed to confirm payment.',
       );
     }
+  }
+
+  Map<String, dynamic>? _extractReceipt(dynamic raw) {
+    if (raw is! Map) return null;
+    final map = raw.map((k, v) => MapEntry(k.toString(), v));
+    for (final key in const [
+      'data',
+      'receipt',
+      'payment',
+      'transaction',
+      'subscription',
+      'payload',
+      'result',
+    ]) {
+      final val = map[key];
+      if (val is Map) return val.map((k, v) => MapEntry(k.toString(), v));
+    }
+    return map;
   }
 
   Map<String, dynamic> _extractData(dynamic raw) {

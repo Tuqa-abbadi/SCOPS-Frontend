@@ -270,9 +270,21 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                         borderRadius: BorderRadius.circular(13),
                         border: Border.all(color: statusColor.withValues(alpha: 0.28)),
                       ),
-                      child: Center(
-                        child: Text(sub.serviceIcon,
-                            style: const TextStyle(fontSize: 22)))),
+                      clipBehavior: Clip.antiAlias,
+                      child: sub.serviceLogoUrl != null &&
+                              sub.serviceLogoUrl!.isNotEmpty
+                          ? Image.network(
+                              sub.serviceLogoUrl!,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Center(
+                                child: Text(sub.serviceIcon,
+                                    style: const TextStyle(fontSize: 22)),
+                              ),
+                            )
+                          : Center(
+                              child: Text(sub.serviceIcon,
+                                  style: const TextStyle(fontSize: 22)),
+                            )),
                     const SizedBox(width: 10),
                     Expanded(child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

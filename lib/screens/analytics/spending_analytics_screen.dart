@@ -7,10 +7,28 @@ import '../../../blocs/analytics/analytics_model.dart';
 // TODO Sprint 4: replace mockAnalytics() with real API data per user.
 
 class SpendingAnalyticsScreen extends StatefulWidget {
-  const SpendingAnalyticsScreen({super.key});
+  const SpendingAnalyticsScreen({
+    super.key,
+    this.data,
+    this.embedded = false,
+    this.padding = const EdgeInsets.fromLTRB(20, 16, 20, 32),
+  });
+
+  final AnalyticsData? data;
+  final bool embedded;
+  final EdgeInsetsGeometry padding;
 
   @override
-  State<SpendingAnalyticsScreen> createState() => _SpendingAnalyticsScreenState();
+  State<SpendingAnalyticsScreen> createState() =>
+      _SpendingAnalyticsScreenState();
+}
+
+class SpendingAnalyticsView extends SpendingAnalyticsScreen {
+  const SpendingAnalyticsView({
+    super.key,
+    super.data,
+    super.padding = EdgeInsets.zero,
+  }) : super(embedded: true);
 }
 
 class _SpendingAnalyticsScreenState extends State<SpendingAnalyticsScreen>
@@ -22,22 +40,34 @@ class _SpendingAnalyticsScreenState extends State<SpendingAnalyticsScreen>
   int? _selectedBar;
   int? _selectedSlice;
 
-  static const _bg     = Color(0xFF020812);
-  static const _card   = Color(0xFF07111C);
-  static const _cyan   = Color(0xFF18E8F2);
+  static const _bg = Color(0xFF020812);
+  static const _card = Color(0xFF07111C);
+  static const _cyan = Color(0xFF18E8F2);
   static const _orange = Color(0xFFFF5A14);
-  static const _white  = Colors.white;
-  static const _muted  = Color(0xFF9BA4B0);
+  static const _white = Colors.white;
+  static const _muted = Color(0xFF9BA4B0);
 
   @override
   void initState() {
     super.initState();
-    _barCtrl   = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
-    _donutCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
-    _barAnim   = CurvedAnimation(parent: _barCtrl,   curve: Curves.easeOutCubic);
-    _donutAnim = CurvedAnimation(parent: _donutCtrl, curve: Curves.easeOutCubic);
+    _barCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _donutCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    );
+    _barAnim = CurvedAnimation(parent: _barCtrl, curve: Curves.easeOutCubic);
+    _donutAnim = CurvedAnimation(
+      parent: _donutCtrl,
+      curve: Curves.easeOutCubic,
+    );
     _barCtrl.forward();
-    Future.delayed(const Duration(milliseconds: 200), () => _donutCtrl.forward());
+    Future.delayed(
+      const Duration(milliseconds: 200),
+      () => _donutCtrl.forward(),
+    );
   }
 
   @override
@@ -49,47 +79,69 @@ class _SpendingAnalyticsScreenState extends State<SpendingAnalyticsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final data = mockAnalytics();
+    final data = widget.data ?? mockAnalytics();
     final trend = data.trendPercent;
     final trendUp = trend >= 0;
 
-    return Scaffold(
-      backgroundColor: _bg,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-          child: Column(
+    final content = Padding(
+      padding: widget.padding,
+      child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
               Row(
                 children: [
-                  const Text('Analytics',
-                      style: TextStyle(color: _white, fontSize: 32, fontWeight: FontWeight.w900)),
+                  const Text(
+                    'Analytics',
+                    style: TextStyle(
+                      color: _white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                   const Spacer(),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: _card,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: Colors.white.withOpacity(0.08)),
                     ),
-                    child: const Text('Last 6 months',
-                        style: TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w600)),
+                    child: const Text(
+                      'Last 6 months',
+                      style: TextStyle(
+                        color: _muted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 4),
-              const Text('Spending overview and insights',
-                  style: TextStyle(color: _muted, fontSize: 13)),
+              const Text(
+                'Spending overview and insights',
+                style: TextStyle(color: _muted, fontSize: 13),
+              ),
               const SizedBox(height: 24),
 
               // KPI row
               Row(
                 children: [
-                  _kpiCard('\$${data.totalThisMonth.toStringAsFixed(2)}', 'This Month', _cyan),
+                  _kpiCard(
+                    '\$${data.totalThisMonth.toStringAsFixed(2)}',
+                    'This Month',
+                    _cyan,
+                  ),
                   const SizedBox(width: 12),
-                  _kpiCard('\$${data.avgMonthly.toStringAsFixed(2)}', 'Monthly Avg', _muted),
+                  _kpiCard(
+                    '\$${data.avgMonthly.toStringAsFixed(2)}',
+                    'Monthly Avg',
+                    _muted,
+                  ),
                   const SizedBox(width: 12),
                   _kpiTrendCard(trend, trendUp),
                 ],
@@ -114,11 +166,13 @@ class _SpendingAnalyticsScreenState extends State<SpendingAnalyticsScreen>
                         animation: _barAnim,
                         builder: (_, __) => GestureDetector(
                           onTapDown: (d) {
-                            final box = context.findRenderObject() as RenderBox?;
+                            final box =
+                                context.findRenderObject() as RenderBox?;
                             if (box == null) return;
                             final w = box.size.width - 40 - 32;
                             final barW = w / data.monthly.length;
-                            final idx = (d.localPosition.dx / barW).floor()
+                            final idx = (d.localPosition.dx / barW)
+                                .floor()
                                 .clamp(0, data.monthly.length - 1);
                             setState(() => _selectedBar = idx);
                           },
@@ -139,7 +193,11 @@ class _SpendingAnalyticsScreenState extends State<SpendingAnalyticsScreen>
                       const SizedBox(height: 12),
                       Text(
                         '${data.monthly[_selectedBar!].month}: \$${data.monthly[_selectedBar!].amount.toStringAsFixed(2)}',
-                        style: const TextStyle(color: _cyan, fontSize: 13, fontWeight: FontWeight.w700),
+                        style: const TextStyle(
+                          color: _cyan,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ],
                   ],
@@ -201,11 +259,22 @@ class _SpendingAnalyticsScreenState extends State<SpendingAnalyticsScreen>
                                   d.localPosition.dy - center.dy,
                                   d.localPosition.dx - center.dx,
                                 );
-                                final total = data.byCategory.fold(0.0, (s, c) => s + c.amount);
+                                final total = data.byCategory.fold(
+                                  0.0,
+                                  (s, c) => s + c.amount,
+                                );
                                 double cumAngle = -math.pi / 2;
-                                for (int i = 0; i < data.byCategory.length; i++) {
-                                  final sweep = (data.byCategory[i].amount / total) * 2 * math.pi;
-                                  if (angle >= cumAngle && angle <= cumAngle + sweep) {
+                                for (
+                                  int i = 0;
+                                  i < data.byCategory.length;
+                                  i++
+                                ) {
+                                  final sweep =
+                                      (data.byCategory[i].amount / total) *
+                                      2 *
+                                      math.pi;
+                                  if (angle >= cumAngle &&
+                                      angle <= cumAngle + sweep) {
                                     setState(() => _selectedSlice = i);
                                     break;
                                   }
@@ -230,33 +299,54 @@ class _SpendingAnalyticsScreenState extends State<SpendingAnalyticsScreen>
                             children: data.byCategory.asMap().entries.map((e) {
                               final isSelected = _selectedSlice == e.key;
                               final color = _hexColor(e.value.color);
-                              final total = data.byCategory.fold(0.0, (s, c) => s + c.amount);
-                              final pct = (e.value.amount / total * 100).toStringAsFixed(0);
+                              final total = data.byCategory.fold(
+                                0.0,
+                                (s, c) => s + c.amount,
+                              );
+                              final pct = (e.value.amount / total * 100)
+                                  .toStringAsFixed(0);
                               return AnimatedContainer(
                                 duration: const Duration(milliseconds: 200),
                                 margin: const EdgeInsets.only(bottom: 8),
                                 padding: EdgeInsets.symmetric(
-                                    horizontal: isSelected ? 8 : 0, vertical: isSelected ? 4 : 0),
+                                  horizontal: isSelected ? 8 : 0,
+                                  vertical: isSelected ? 4 : 0,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: isSelected ? color.withOpacity(0.10) : Colors.transparent,
+                                  color: isSelected
+                                      ? color.withOpacity(0.10)
+                                      : Colors.transparent,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Row(
                                   children: [
                                     Container(
-                                      width: 8, height: 8,
+                                      width: 8,
+                                      height: 8,
                                       decoration: BoxDecoration(
-                                        shape: BoxShape.circle, color: color),
+                                        shape: BoxShape.circle,
+                                        color: color,
+                                      ),
                                     ),
                                     const SizedBox(width: 8),
-                                    Expanded(child: Text(e.value.category,
+                                    Expanded(
+                                      child: Text(
+                                        e.value.category,
                                         style: TextStyle(
-                                            color: isSelected ? _white : _muted,
-                                            fontSize: 11, fontWeight: FontWeight.w600))),
-                                    Text('$pct%',
-                                        style: TextStyle(
-                                            color: isSelected ? color : _muted,
-                                            fontSize: 11, fontWeight: FontWeight.w800)),
+                                          color: isSelected ? _white : _muted,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      '$pct%',
+                                      style: TextStyle(
+                                        color: isSelected ? color : _muted,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               );
@@ -268,23 +358,41 @@ class _SpendingAnalyticsScreenState extends State<SpendingAnalyticsScreen>
                     if (_selectedSlice != null) ...[
                       const SizedBox(height: 14),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
-                          color: _hexColor(data.byCategory[_selectedSlice!].color).withOpacity(0.10),
+                          color: _hexColor(
+                            data.byCategory[_selectedSlice!].color,
+                          ).withOpacity(0.10),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: _hexColor(data.byCategory[_selectedSlice!].color).withOpacity(0.30)),
+                            color: _hexColor(
+                              data.byCategory[_selectedSlice!].color,
+                            ).withOpacity(0.30),
+                          ),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(data.byCategory[_selectedSlice!].category,
-                                style: TextStyle(
-                                    color: _hexColor(data.byCategory[_selectedSlice!].color),
-                                    fontWeight: FontWeight.w800)),
+                            Text(
+                              data.byCategory[_selectedSlice!].category,
+                              style: TextStyle(
+                                color: _hexColor(
+                                  data.byCategory[_selectedSlice!].color,
+                                ),
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                             const SizedBox(width: 12),
-                            Text('\$${data.byCategory[_selectedSlice!].amount.toStringAsFixed(2)}',
-                                style: const TextStyle(color: _white, fontWeight: FontWeight.w900)),
+                            Text(
+                              '\$${data.byCategory[_selectedSlice!].amount.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                color: _white,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -293,61 +401,93 @@ class _SpendingAnalyticsScreenState extends State<SpendingAnalyticsScreen>
                 ),
               ),
             ],
-          ),
-        ),
+      ),
+    );
+
+    if (widget.embedded) return content;
+
+    return Scaffold(
+      backgroundColor: _bg,
+      body: SafeArea(
+        child: SingleChildScrollView(child: content),
       ),
     );
   }
 
-  Widget _sectionTitle(String t) => Text(t,
-      style: const TextStyle(color: _white, fontSize: 18, fontWeight: FontWeight.w800));
+  Widget _sectionTitle(String t) => Text(
+    t,
+    style: const TextStyle(
+      color: _white,
+      fontSize: 18,
+      fontWeight: FontWeight.w800,
+    ),
+  );
 
   Widget _kpiCard(String val, String label, Color color) => Expanded(
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: _card,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: color.withOpacity(0.20)),
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withOpacity(0.20)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            val,
+            style: TextStyle(
+              color: color,
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+            ),
           ),
-          child: Column(
-            children: [
-              Text(val, style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 4),
-              Text(label, style: const TextStyle(color: _muted, fontSize: 10)),
-            ],
-          ),
-        ),
-      );
+          const SizedBox(height: 4),
+          Text(label, style: const TextStyle(color: _muted, fontSize: 10)),
+        ],
+      ),
+    ),
+  );
 
   Widget _kpiTrendCard(double trend, bool up) => Expanded(
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: _card,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: (up ? _orange : const Color(0xFF22C55E)).withOpacity(0.25)),
-          ),
-          child: Column(
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: (up ? _orange : const Color(0xFF22C55E)).withOpacity(0.25),
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(up ? Icons.trending_up_rounded : Icons.trending_down_rounded,
-                      color: up ? _orange : const Color(0xFF22C55E), size: 16),
-                  const SizedBox(width: 4),
-                  Text('${trend.abs().toStringAsFixed(1)}%',
-                      style: TextStyle(
-                          color: up ? _orange : const Color(0xFF22C55E),
-                          fontSize: 16, fontWeight: FontWeight.w900)),
-                ],
+              Icon(
+                up ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                color: up ? _orange : const Color(0xFF22C55E),
+                size: 16,
               ),
-              const SizedBox(height: 4),
-              const Text('vs Last Month', style: TextStyle(color: _muted, fontSize: 10)),
+              const SizedBox(width: 4),
+              Text(
+                '${trend.abs().toStringAsFixed(1)}%',
+                style: TextStyle(
+                  color: up ? _orange : const Color(0xFF22C55E),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ],
           ),
-        ),
-      );
+          const SizedBox(height: 4),
+          const Text(
+            'vs Last Month',
+            style: TextStyle(color: _muted, fontSize: 10),
+          ),
+        ],
+      ),
+    ),
+  );
 
   Color _hexColor(String hex) {
     final h = hex.replaceAll('#', '');
@@ -363,24 +503,29 @@ class _BarChartPainter extends CustomPainter {
   final Color cyan;
   final Color orange;
 
-  _BarChartPainter({required this.data, required this.progress,
-      required this.selected, required this.cyan, required this.orange});
+  _BarChartPainter({
+    required this.data,
+    required this.progress,
+    required this.selected,
+    required this.cyan,
+    required this.orange,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (data.isEmpty) return;
     final maxVal = data.map((d) => d.amount).reduce(math.max);
-    final barW   = size.width / data.length;
-    final padX   = barW * 0.2;
+    final barW = size.width / data.length;
+    final padX = barW * 0.2;
     final labelH = 20.0;
     final chartH = size.height - labelH;
 
     for (int i = 0; i < data.length; i++) {
-      final pct    = data[i].amount / maxVal;
-      final barH   = chartH * pct * progress;
-      final left   = i * barW + padX;
-      final right  = (i + 1) * barW - padX;
-      final top    = chartH - barH;
+      final pct = maxVal <= 0 ? 0.0 : data[i].amount / maxVal;
+      final barH = chartH * pct * progress;
+      final left = i * barW + padX;
+      final right = (i + 1) * barW - padX;
+      final top = chartH - barH;
       final isSelected = selected == i;
 
       final paint = Paint()
@@ -427,20 +572,27 @@ class _TrendLinePainter extends CustomPainter {
   final Color cyan;
   final Color orange;
 
-  _TrendLinePainter({required this.data, required this.progress,
-      required this.cyan, required this.orange});
+  _TrendLinePainter({
+    required this.data,
+    required this.progress,
+    required this.cyan,
+    required this.orange,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (data.length < 2) return;
     final maxVal = data.map((d) => d.amount).reduce(math.max);
     final minVal = data.map((d) => d.amount).reduce(math.min);
-    final range  = (maxVal - minVal).clamp(1.0, double.infinity);
+    final range = (maxVal - minVal).clamp(1.0, double.infinity);
 
     List<Offset> pts = [];
     for (int i = 0; i < data.length; i++) {
       final x = i / (data.length - 1) * size.width;
-      final y = size.height - ((data[i].amount - minVal) / range) * size.height * 0.8 - size.height * 0.1;
+      final y =
+          size.height -
+          ((data[i].amount - minVal) / range) * size.height * 0.8 -
+          size.height * 0.1;
       pts.add(Offset(x, y));
     }
 
@@ -451,7 +603,9 @@ class _TrendLinePainter extends CustomPainter {
     // Fill area
     final fillPath = Path();
     fillPath.moveTo(visiblePts.first.dx, size.height);
-    for (final p in visiblePts) fillPath.lineTo(p.dx, p.dy);
+    for (final p in visiblePts) {
+      fillPath.lineTo(p.dx, p.dy);
+    }
     fillPath.lineTo(visiblePts.last.dx, size.height);
     fillPath.close();
 
@@ -492,7 +646,8 @@ class _TrendLinePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _TrendLinePainter old) => old.progress != progress;
+  bool shouldRepaint(covariant _TrendLinePainter old) =>
+      old.progress != progress;
 }
 
 // ── Donut Chart Painter ───────────────────────────────────────────────────
@@ -501,7 +656,11 @@ class _DonutPainter extends CustomPainter {
   final double progress;
   final int? selected;
 
-  _DonutPainter({required this.categories, required this.progress, required this.selected});
+  _DonutPainter({
+    required this.categories,
+    required this.progress,
+    required this.selected,
+  });
 
   Color _hexColor(String hex) {
     final h = hex.replaceAll('#', '');
@@ -510,11 +669,12 @@ class _DonutPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final total  = categories.fold(0.0, (s, c) => s + c.amount);
+    final total = categories.fold(0.0, (s, c) => s + c.amount);
+    if (total <= 0) return;
     final center = size.center(Offset.zero);
     final radius = size.width / 2;
     const innerR = 0.58;
-    const gap    = 0.03;
+    const gap = 0.03;
 
     double startAngle = -math.pi / 2;
 
@@ -526,11 +686,16 @@ class _DonutPainter extends CustomPainter {
       final paint = Paint()
         ..color = isSelected ? color : color.withOpacity(0.75)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = isSelected ? radius * (1 - innerR) + 8 : radius * (1 - innerR)
+        ..strokeWidth = isSelected
+            ? radius * (1 - innerR) + 8
+            : radius * (1 - innerR)
         ..strokeCap = StrokeCap.butt;
 
       canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius * (innerR + (1 - innerR) / 2)),
+        Rect.fromCircle(
+          center: center,
+          radius: radius * (innerR + (1 - innerR) / 2),
+        ),
         startAngle + gap,
         sweep - gap * 2,
         false,
@@ -549,7 +714,10 @@ class _DonutPainter extends CustomPainter {
                   ? '\$${categories[selected!].amount.toStringAsFixed(0)}'
                   : '\$${total.toStringAsFixed(0)}',
               style: const TextStyle(
-                  color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900),
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ],
         ),

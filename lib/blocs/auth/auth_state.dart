@@ -110,7 +110,16 @@ class SignupState extends AuthState {
 }
 
 class SignupSuccess extends AuthState {
-  const SignupSuccess();
+  const SignupSuccess({
+    required this.email,
+    required this.message,
+  });
+
+  final String email;
+  final String message;
+
+  @override
+  List<Object> get props => [email, message];
 }
 
 class SignupGoBack extends AuthState {
@@ -132,6 +141,94 @@ class LogoutFailure extends AuthState {
 
   @override
   List<Object> get props => [error];
+}
+
+class ResetPasswordState extends AuthState {
+  const ResetPasswordState({
+    this.isVerifying = false,
+    this.isCodeVerified = false,
+    this.verifyError,
+    this.isResetting = false,
+    this.isSuccess = false,
+    this.resetError,
+  });
+
+  final bool isVerifying;
+  final bool isCodeVerified;
+  final String? verifyError;
+  final bool isResetting;
+  final bool isSuccess;
+  final String? resetError;
+
+  ResetPasswordState copyWith({
+    bool? isVerifying,
+    bool? isCodeVerified,
+    String? verifyError,
+    bool clearVerifyError = false,
+    bool? isResetting,
+    bool? isSuccess,
+    String? resetError,
+    bool clearResetError = false,
+  }) {
+    return ResetPasswordState(
+      isVerifying: isVerifying ?? this.isVerifying,
+      isCodeVerified: isCodeVerified ?? this.isCodeVerified,
+      verifyError:
+          clearVerifyError ? null : (verifyError ?? this.verifyError),
+      isResetting: isResetting ?? this.isResetting,
+      isSuccess: isSuccess ?? this.isSuccess,
+      resetError: clearResetError ? null : (resetError ?? this.resetError),
+    );
+  }
+
+  @override
+  List<Object> get props => [
+        isVerifying,
+        isCodeVerified,
+        verifyError ?? '',
+        isResetting,
+        isSuccess,
+        resetError ?? '',
+      ];
+}
+
+class EmailVerificationState extends AuthState {
+  const EmailVerificationState({
+    this.isVerifying = false,
+    this.isVerified = false,
+    this.errorMessage,
+    this.successMessage,
+  });
+
+  final bool isVerifying;
+  final bool isVerified;
+  final String? errorMessage;
+  final String? successMessage;
+
+  EmailVerificationState copyWith({
+    bool? isVerifying,
+    bool? isVerified,
+    String? errorMessage,
+    String? successMessage,
+    bool clearError = false,
+    bool clearSuccess = false,
+  }) {
+    return EmailVerificationState(
+      isVerifying: isVerifying ?? this.isVerifying,
+      isVerified: isVerified ?? this.isVerified,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      successMessage:
+          clearSuccess ? null : (successMessage ?? this.successMessage),
+    );
+  }
+
+  @override
+  List<Object> get props => [
+        isVerifying,
+        isVerified,
+        errorMessage ?? '',
+        successMessage ?? '',
+      ];
 }
 
 class ForgotPasswordState extends AuthState {

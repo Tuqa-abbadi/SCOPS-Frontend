@@ -54,7 +54,7 @@ class ServiceModel extends Equatable {
       category: category,
       // Use safe int parsing — backend may send integers as strings or doubles.
       categoryId: _parseInt(json['category_id']),
-      logoUrl: json['logo_url'] as String?,
+      logoUrl: resolveLogoUrlFromJson(json),
       icon: json['icon'] as String? ?? '📦',
       description: json['description'] as String? ?? '',
       plans: _parsePlans(json['plans']),

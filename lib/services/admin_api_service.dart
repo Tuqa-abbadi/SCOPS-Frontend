@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 
 import '../core/constants/api_constants.dart';
@@ -81,19 +83,29 @@ class AdminApiService {
     required String billingCycle,
     String? description,
     int? categoryId,
-    String? logoUrl,
-  }) {
-    final body = <String, dynamic>{
+    File? logoFile,
+  }) async {
+    final fields = <String, dynamic>{
       'name': name,
-      'default_amount': defaultAmount,
+      'default_amount': defaultAmount.toString(),
       'billing_cycle': billingCycle,
     };
     if (description != null && description.isNotEmpty) {
-      body['description'] = description;
+      fields['description'] = description;
     }
-    if (categoryId != null) body['category_id'] = categoryId;
-    if (logoUrl != null && logoUrl.isNotEmpty) body['logo_url'] = logoUrl;
-    return _dio.post(ApiConstants.adminServices, data: body);
+    if (categoryId != null) fields['category_id'] = categoryId.toString();
+
+    if (logoFile != null) {
+      final formData = FormData.fromMap({
+        ...fields,
+        'logo': await MultipartFile.fromFile(
+          logoFile.path,
+          filename: logoFile.path.split('/').last,
+        ),
+      });
+      return _dio.post(ApiConstants.adminServices, data: formData);
+    }
+    return _dio.post(ApiConstants.adminServices, data: fields);
   }
 
   Future<Response<dynamic>> updateService(
@@ -103,16 +115,26 @@ class AdminApiService {
     String? billingCycle,
     String? description,
     int? categoryId,
-    String? logoUrl,
-  }) {
-    final body = <String, dynamic>{};
-    if (name != null) body['name'] = name;
-    if (defaultAmount != null) body['default_amount'] = defaultAmount;
-    if (billingCycle != null) body['billing_cycle'] = billingCycle;
-    if (description != null) body['description'] = description;
-    if (categoryId != null) body['category_id'] = categoryId;
-    if (logoUrl != null) body['logo_url'] = logoUrl;
-    return _dio.put(ApiConstants.adminServiceById(id), data: body);
+    File? logoFile,
+  }) async {
+    final fields = <String, dynamic>{};
+    if (name != null) fields['name'] = name;
+    if (defaultAmount != null) fields['default_amount'] = defaultAmount.toString();
+    if (billingCycle != null) fields['billing_cycle'] = billingCycle;
+    if (description != null) fields['description'] = description;
+    if (categoryId != null) fields['category_id'] = categoryId.toString();
+
+    if (logoFile != null) {
+      final formData = FormData.fromMap({
+        ...fields,
+        'logo': await MultipartFile.fromFile(
+          logoFile.path,
+          filename: logoFile.path.split('/').last,
+        ),
+      });
+      return _dio.put(ApiConstants.adminServiceById(id), data: formData);
+    }
+    return _dio.put(ApiConstants.adminServiceById(id), data: fields);
   }
 
   Future<Response<dynamic>> deleteService(int id) =>

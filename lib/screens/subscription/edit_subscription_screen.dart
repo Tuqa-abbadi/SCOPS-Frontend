@@ -132,8 +132,29 @@ class _EditSubscriptionScreenState extends State<EditSubscriptionScreen> {
                 onPressed: () => Navigator.pop(context),
                 icon: Icon(Icons.arrow_back_ios_new_rounded,
                     color: _white, size: 20)),
-              Text(sub.serviceIcon,
-                  style: const TextStyle(fontSize: 24)),
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: sub.serviceLogoUrl != null &&
+                        sub.serviceLogoUrl!.isNotEmpty
+                    ? Image.network(
+                        sub.serviceLogoUrl!,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Center(
+                          child: Text(sub.serviceIcon,
+                              style: const TextStyle(fontSize: 22)),
+                        ),
+                      )
+                    : Center(
+                        child: Text(sub.serviceIcon,
+                            style: const TextStyle(fontSize: 22)),
+                      ),
+              ),
               const SizedBox(width: 10),
               Expanded(child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

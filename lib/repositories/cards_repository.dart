@@ -203,7 +203,9 @@ class CardsRepository {
         raw = c;
       }
     }
-    return raw.whereType<Map<String, dynamic>>().map(CardModel.fromJson).toList();
+    final cards = raw.whereType<Map<String, dynamic>>().toList();
+    _log('Raw cards JSON: $cards');
+    return cards.map(CardModel.fromJson).toList();
   }
 
   CardModel? _parseCard(dynamic data) {

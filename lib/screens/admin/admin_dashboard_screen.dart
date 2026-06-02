@@ -1,16 +1,20 @@
-﻿import 'dart:math' as math;
+﻿import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../blocs/admin/admin_bloc.dart';
 import '../../blocs/auth/auth_bloc.dart';
+import '../../blocs/subscription/subscription_bloc.dart';
 import '../../blocs/user/user_cubit.dart';
-import '../splash/splash_screen.dart';
+import '../../blocs/wallet/wallet_bloc.dart';
+import '../auth/auth_choice_screen.dart';
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 const _bg = Color(0xFF020812);
@@ -134,8 +138,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     return BlocListener<LogoutBloc, AuthState>(
       listener: (context, state) {
         if (state is LogoutSuccess) {
+          context.read<UserCubit>().clearUser();
+          context.read<SubscriptionBloc>().add(const SubscriptionReset());
+          context.read<WalletBloc>().add(const WalletReset());
           Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const SplashScreen()),
+            MaterialPageRoute(builder: (_) => const AuthChoiceScreen()),
             (_) => false,
           );
         }
@@ -176,44 +183,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     child: Row(
       children: [
         Image.asset(
-          'assets/images/scops_admin.png',
-          width: 30,
-          height: 30,
+          'assets/images/owl_cyan.png',
+          height: 32,
           fit: BoxFit.contain,
         ),
-        const SizedBox(width: 10),
-        RichText(
-          text: const TextSpan(
-            children: [
-              TextSpan(
-                text: 'SCOPS',
-                style: TextStyle(
-                  color: _white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.4,
-                ),
-              ),
-              TextSpan(
-                text: ' | ',
-                style: TextStyle(
-                  color: _muted,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w300,
-                  letterSpacing: 0,
-                ),
-              ),
-              TextSpan(
-                text: 'ADMIN',
-                style: TextStyle(
-                  color: _orange,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.4,
-                ),
-              ),
-            ],
-          ),
+        const SizedBox(width: 12),
+        Image.asset(
+          'assets/images/scops_admin.png',
+          width: 140,
+          fit: BoxFit.contain,
         ),
         const Spacer(),
         if (_currentIndex != 3)
@@ -600,14 +578,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           const SizedBox(height: 24),
 
           _ProfileAction(
-            icon: Icons.exit_to_app_rounded,
-            label: 'Exit Admin Panel',
-            subtitle: 'Return to the SCOPS app',
-            color: _cyan,
-            onTap: () => Navigator.pop(context),
-          ),
-          const SizedBox(height: 12),
-          _ProfileAction(
             icon: Icons.logout_rounded,
             label: 'Sign Out',
             subtitle: 'Log out of your account',
@@ -725,7 +695,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 icon: Icons.add_business_rounded,
                 label: 'Add Service',
                 color: _cyan,
-                onTap: () => _showServiceForm(context),
+                onTap: () => _showServiceForm(context, categories: data.categories),
               ),
               _ActionBtn(
                 icon: Icons.people_rounded,
@@ -891,50 +861,71 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
   Widget _usersTab(AdminData data) {
     final filtered = _filteredUsers(data.users);
+    final activeCount = data.users.where((u) => u.isActive).length;
+    final inactiveCount = data.users.length - activeCount;
+
     return Column(
       children: [
+        // Search + Add button
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           child: Row(
             children: [
-              Expanded(child: _searchField('Search users…')),
+              Expanded(child: _buildSearchBar()),
               const SizedBox(width: 10),
-              _squareBtn(
-                Icons.person_add_alt_1_rounded,
-                _orange,
-                () => _showUserForm(context),
-              ),
+              _buildAddUserBtn(),
             ],
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
+        // Filter chips with counts
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             children: [
-              _filterChip('All', _UserFilter.all),
-              _filterChip('Active', _UserFilter.active),
-              _filterChip('Inactive', _UserFilter.inactive),
+              _filterChip('All', _UserFilter.all, data.users.length),
+              _filterChip('Active', _UserFilter.active, activeCount),
+              _filterChip('Inactive', _UserFilter.inactive, inactiveCount),
             ],
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
+        // List
         Expanded(
           child: filtered.isEmpty
-              ? _emptyState(
-                  icon: Icons.people_outline_rounded,
-                  message: data.users.isEmpty
-                      ? 'No users found.'
-                      : 'No users match your search.',
-                )
+              ? _buildUsersEmptyState(data.users.isEmpty)
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   itemCount: filtered.length,
-                  itemBuilder: (_, i) => _UserCard(
-                    user: filtered[i],
-                    onTap: () => _showUserDetail(context, filtered[i]),
-                  ),
+                  itemBuilder: (_, i) {
+                    final u = filtered[i];
+                    return _UserCard(
+                      user: u,
+                      onTap: () => _showUserDetail(context, u),
+                      onEdit: () => _showUserForm(context, user: u),
+                      onToggle: () => _confirmAction(
+                        context,
+                        title: u.isActive ? 'Disable user?' : 'Enable user?',
+                        body: u.isActive
+                            ? 'Disabling will prevent ${u.fullName} from logging in.'
+                            : 'Enable ${u.fullName}\'s account?',
+                        confirmLabel: u.isActive ? 'Disable' : 'Enable',
+                        confirmColor: u.isActive ? _red : _green,
+                        onConfirm: () => context
+                            .read<AdminBloc>()
+                            .add(AdminUserToggleRequested(u.id)),
+                      ),
+                      onDelete: () => _confirmDelete(
+                        context,
+                        title: 'Delete user?',
+                        body: 'This will permanently remove ${u.fullName}.',
+                        onConfirm: () => context
+                            .read<AdminBloc>()
+                            .add(AdminUserDeleteRequested(u.id)),
+                      ),
+                    );
+                  },
                 ),
         ),
       ],
@@ -963,7 +954,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               icon: Icons.add_rounded,
               label: 'Add Service',
               color: _orange,
-              onTap: () => _showServiceForm(context),
+              onTap: () => _showServiceForm(context, categories: data.categories),
             ),
           ],
         ),
@@ -982,7 +973,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   final svc = data.services[i];
                   return _ServiceCard(
                     service: svc,
-                    onEdit: () => _showServiceForm(context, service: svc),
+                    onEdit: () => _showServiceForm(
+                      context,
+                      service: svc,
+                      categories: data.categories,
+                    ),
                     onDelete: () => _confirmDelete(
                       context,
                       title: 'Delete service?',
@@ -998,70 +993,203 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     ],
   );
 
-  // ── Search / filter ────────────────────────────────────────────────────────
+  // ── Search / filter / buttons ──────────────────────────────────────────────
 
-  Widget _searchField(String hint) => Container(
-    height: 48,
-    decoration: _adminDeco(_cyan, radius: 16),
+  Widget _buildSearchBar() => Container(
+    height: 52,
+    decoration: BoxDecoration(
+      color: const Color(0xFF0D1520),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: _cyan.withValues(alpha: 0.20), width: 1.0),
+      boxShadow: [
+        BoxShadow(
+          color: _cyan.withValues(alpha: 0.06),
+          blurRadius: 20,
+          offset: const Offset(0, 6),
+        ),
+      ],
+    ),
     child: TextField(
       controller: _searchCtrl,
-      style: const TextStyle(color: _white, fontSize: 14),
+      style: const TextStyle(
+        color: Color(0xFFF5F7FA),
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+      ),
       decoration: InputDecoration(
-        hintText: hint,
+        hintText: 'Search users…',
         hintStyle: TextStyle(
-          color: _muted.withValues(alpha: 0.65),
-          fontSize: 13,
+          color: const Color(0xFF8B98A8).withValues(alpha: 0.65),
+          fontSize: 14,
         ),
-        prefixIcon: const Icon(Icons.search_rounded, color: _muted, size: 20),
+        prefixIcon: Padding(
+          padding: const EdgeInsets.only(left: 14, right: 10),
+          child: Icon(
+            Icons.search_rounded,
+            color: _cyan.withValues(alpha: 0.70),
+            size: 22,
+          ),
+        ),
+        prefixIconConstraints: const BoxConstraints(),
+        suffixIcon: _searchCtrl.text.isNotEmpty
+            ? GestureDetector(
+                onTap: () => _searchCtrl.clear(),
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: Icon(
+                    Icons.close_rounded,
+                    color: const Color(0xFF8B98A8).withValues(alpha: 0.60),
+                    size: 18,
+                  ),
+                ),
+              )
+            : null,
+        suffixIconConstraints: const BoxConstraints(),
         border: InputBorder.none,
-        contentPadding: const EdgeInsets.symmetric(vertical: 13),
+        contentPadding: const EdgeInsets.symmetric(vertical: 16),
       ),
     ),
   );
 
-  Widget _filterChip(String label, _UserFilter f) {
+  Widget _buildAddUserBtn() => GestureDetector(
+    onTap: () => _showUserForm(context),
+    child: Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [_orangeLight, _orange],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: _orange.withValues(alpha: 0.45),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: _orange.withValues(alpha: 0.18),
+            blurRadius: 32,
+            spreadRadius: 2,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: const Icon(Icons.person_add_rounded, color: Colors.white, size: 22),
+    ),
+  );
+
+  Widget _filterChip(String label, _UserFilter f, int count) {
     final selected = _filter == f;
     return GestureDetector(
       onTap: () => setState(() => _filter = f),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
+        duration: const Duration(milliseconds: 200),
         margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
-          color: selected ? _cyan.withValues(alpha: 0.12) : _card,
-          borderRadius: BorderRadius.circular(16),
+          gradient: selected
+              ? LinearGradient(
+                  colors: [
+                    _cyan.withValues(alpha: 0.18),
+                    _cyan.withValues(alpha: 0.07),
+                  ],
+                )
+              : null,
+          color: selected ? null : const Color(0xFF0D1520),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: selected
-                ? _cyan.withValues(alpha: 0.45)
+                ? _cyan.withValues(alpha: 0.50)
                 : _white.withValues(alpha: 0.07),
           ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: _cyan.withValues(alpha: 0.14),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? _cyan : _muted,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? _cyan : _muted,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: selected
+                    ? _cyan.withValues(alpha: 0.20)
+                    : _white.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  color: selected ? _cyan : _muted,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _squareBtn(IconData icon, Color color, VoidCallback onTap) =>
-      GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 48,
-          height: 48,
+  Widget _buildUsersEmptyState(bool noData) => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 72,
+          height: 72,
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withValues(alpha: 0.28)),
+            color: _cyan.withValues(alpha: 0.06),
+            shape: BoxShape.circle,
+            border: Border.all(color: _cyan.withValues(alpha: 0.18)),
           ),
-          child: Icon(icon, color: color, size: 20),
+          child: Icon(
+            Icons.people_outline_rounded,
+            color: _cyan.withValues(alpha: 0.50),
+            size: 34,
+          ),
         ),
-      );
+        const SizedBox(height: 16),
+        Text(
+          noData ? 'No users yet' : 'No users match your search',
+          style: const TextStyle(
+            color: Color(0xFFF5F7FA),
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          noData
+              ? 'Users will appear here once added'
+              : 'Try a different search or filter',
+          style: TextStyle(
+            color: _muted.withValues(alpha: 0.70),
+            fontSize: 12,
+          ),
+        ),
+      ],
+    ),
+  );
 
   Widget _emptyState({required IconData icon, required String message}) =>
       Center(
@@ -1354,14 +1482,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
   // ── Service form ───────────────────────────────────────────────────────────
 
-  void _showServiceForm(BuildContext ctx, {AdminServiceModel? service}) {
+  void _showServiceForm(
+    BuildContext ctx, {
+    AdminServiceModel? service,
+    List<AdminCategoryModel> categories = const [],
+  }) {
     final nameCtrl = TextEditingController(text: service?.name ?? '');
     final amountCtrl = TextEditingController(
       text: service != null ? service.defaultAmount.toStringAsFixed(2) : '',
     );
     final descCtrl = TextEditingController(text: service?.description ?? '');
-    final logoCtrl = TextEditingController(text: service?.logoUrl ?? '');
     String cycle = service?.billingCycle.toLowerCase() ?? 'monthly';
+    int? selectedCategoryId = service?.categoryId;
+    File? pickedLogoFile;
     final formKey = GlobalKey<FormState>();
 
     showModalBottomSheet(
@@ -1400,6 +1533,75 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       : null,
                 ),
                 const SizedBox(height: 12),
+                // Category dropdown
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _field,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: selectedCategoryId == null
+                          ? _red.withValues(alpha: 0.40)
+                          : _white.withValues(alpha: 0.07),
+                    ),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int?>(
+                      value: selectedCategoryId,
+                      dropdownColor: _field,
+                      style: const TextStyle(color: _white, fontSize: 14),
+                      isExpanded: true,
+                      icon: const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: _muted,
+                      ),
+                      hint: Row(
+                        children: [
+                          const Icon(
+                            Icons.category_rounded,
+                            color: _muted,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            categories.isEmpty
+                                ? 'No categories available'
+                                : 'Select Category *',
+                            style: const TextStyle(color: _muted, fontSize: 14),
+                          ),
+                        ],
+                      ),
+                      items: categories
+                          .map(
+                            (cat) => DropdownMenuItem<int?>(
+                              value: cat.id,
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.category_rounded,
+                                    color: _orange,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    cat.name,
+                                    style: const TextStyle(color: _white),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) =>
+                          setSheet(() => selectedCategoryId = v),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Billing cycle dropdown
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -1435,10 +1637,107 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   ),
                 ),
                 const SizedBox(height: 12),
-                _AdminTextField(
-                  label: 'Logo URL (optional)',
-                  icon: Icons.image_rounded,
-                  controller: logoCtrl,
+                // Logo image picker
+                GestureDetector(
+                  onTap: () async {
+                    final picker = ImagePicker();
+                    final picked = await picker.pickImage(
+                      source: ImageSource.gallery,
+                      imageQuality: 85,
+                    );
+                    if (picked != null) {
+                      setSheet(() => pickedLogoFile = File(picked.path));
+                    }
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: _field,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _white.withValues(alpha: 0.07),
+                      ),
+                    ),
+                    child: pickedLogoFile != null
+                        ? Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.file(
+                                  pickedLogoFile!,
+                                  width: 52,
+                                  height: 52,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              const Expanded(
+                                child: Text(
+                                  'Logo selected — tap to change',
+                                  style: TextStyle(
+                                    color: _muted,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () =>
+                                    setSheet(() => pickedLogoFile = null),
+                                child: const Icon(
+                                  Icons.close_rounded,
+                                  color: _muted,
+                                  size: 18,
+                                ),
+                              ),
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              Container(
+                                width: 52,
+                                height: 52,
+                                decoration: BoxDecoration(
+                                  color: _orange.withValues(alpha: 0.10),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: _orange.withValues(alpha: 0.25),
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.add_photo_alternate_rounded,
+                                  color: _orange,
+                                  size: 26,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Upload Logo',
+                                    style: TextStyle(
+                                      color: _white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    service?.logoUrl != null &&
+                                            service!.logoUrl!.isNotEmpty
+                                        ? 'Has existing logo — tap to replace'
+                                        : 'Optional · tap to pick from gallery',
+                                    style: const TextStyle(
+                                      color: _muted,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 _AdminTextField(
@@ -1457,6 +1756,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   expanded: true,
                   onTap: () {
                     if (!formKey.currentState!.validate()) return;
+                    if (selectedCategoryId == null) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(
+                          content: const Text('Please select a category.'),
+                          backgroundColor: _red,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      );
+                      return;
+                    }
                     Navigator.pop(sheetCtx);
                     if (service == null) {
                       ctx.read<AdminBloc>().add(
@@ -1464,8 +1776,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                           name: nameCtrl.text.trim(),
                           defaultAmount: double.parse(amountCtrl.text.trim()),
                           billingCycle: cycle,
+                          categoryId: selectedCategoryId,
                           description: descCtrl.text.trim(),
-                          logoUrl: logoCtrl.text.trim(),
+                          logoFile: pickedLogoFile,
                         ),
                       );
                     } else {
@@ -1475,8 +1788,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                           name: nameCtrl.text.trim(),
                           defaultAmount: double.parse(amountCtrl.text.trim()),
                           billingCycle: cycle,
+                          categoryId: selectedCategoryId,
                           description: descCtrl.text.trim(),
-                          logoUrl: logoCtrl.text.trim(),
+                          logoFile: pickedLogoFile,
                         ),
                       );
                     }
@@ -1795,100 +2109,492 @@ class _ActionLoadingOverlay extends StatelessWidget {
 
 // ── User card ─────────────────────────────────────────────────────────────────
 
-class _UserCard extends StatelessWidget {
-  const _UserCard({required this.user, required this.onTap});
+class _UserCard extends StatefulWidget {
+  const _UserCard({
+    required this.user,
+    required this.onTap,
+    required this.onEdit,
+    required this.onToggle,
+    required this.onDelete,
+  });
   final AdminUserModel user;
   final VoidCallback onTap;
+  final VoidCallback onEdit;
+  final VoidCallback onToggle;
+  final VoidCallback onDelete;
+
+  @override
+  State<_UserCard> createState() => _UserCardState();
+}
+
+class _UserCardState extends State<_UserCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pressCtrl;
+  late final Animation<double> _scaleAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _pressCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 90),
+    );
+    _scaleAnim = Tween<double>(
+      begin: 1.0,
+      end: 0.975,
+    ).animate(CurvedAnimation(parent: _pressCtrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _pressCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final color = user.isActive ? _cyan : _muted;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: _adminDeco(color, radius: 18),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: color.withValues(alpha: 0.12),
-                border: Border.all(color: color.withValues(alpha: 0.35)),
-              ),
-              child: Center(
-                child: Text(
-                  user.initials,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
+    final u = widget.user;
+    final accentColor = u.isActive ? _cyan : _muted;
+
+    return ScaleTransition(
+      scale: _scaleAnim,
+      child: GestureDetector(
+        onTapDown: (_) => _pressCtrl.forward(),
+        onTapUp: (_) => _pressCtrl.reverse(),
+        onTapCancel: () => _pressCtrl.reverse(),
+        onTap: widget.onTap,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF111B28), Color(0xFF0C1520)],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          user.fullName,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: _white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                      _statusPill(
-                        user.isActive ? 'Active' : 'Inactive',
-                        user.isActive ? _green : _muted,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    user.email,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: _muted, fontSize: 11),
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: [
-                      _smallBadge(
-                        user.role,
-                        user.role == 'admin' ? _orange : _purple,
-                      ),
-                      if (user.createdAt != null)
-                        _smallBadge(
-                          'Joined ${DateFormat('MMM yy').format(user.createdAt!)}',
-                          _muted,
-                        ),
-                    ],
-                  ),
-                ],
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: accentColor.withValues(alpha: 0.20),
+              width: 1.0,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: accentColor.withValues(alpha: u.isActive ? 0.07 : 0.0),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
               ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Avatar
+                _buildAvatar(u, accentColor),
+                const SizedBox(width: 14),
+                // Info
+                Expanded(child: _buildInfo(u)),
+                const SizedBox(width: 10),
+                // Right column
+                _buildRight(context, u),
+              ],
             ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: _white.withValues(alpha: 0.25),
-              size: 20,
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
+
+  Widget _buildAvatar(AdminUserModel u, Color color) => Container(
+    width: 52,
+    height: 52,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      gradient: RadialGradient(
+        colors: [
+          color.withValues(alpha: 0.22),
+          color.withValues(alpha: 0.06),
+        ],
+      ),
+      border: Border.all(color: color.withValues(alpha: 0.55), width: 1.5),
+      boxShadow: u.isActive
+          ? [
+              BoxShadow(
+                color: color.withValues(alpha: 0.25),
+                blurRadius: 16,
+                spreadRadius: 1,
+              ),
+            ]
+          : null,
+    ),
+    child: Center(
+      child: Text(
+        u.initials,
+        style: TextStyle(
+          color: color,
+          fontSize: 20,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    ),
+  );
+
+  Widget _buildInfo(AdminUserModel u) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        u.fullName,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: Color(0xFFF5F7FA),
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+          height: 1.2,
+        ),
+      ),
+      const SizedBox(height: 3),
+      Text(
+        u.email,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: Color(0xFF8B98A8),
+          fontSize: 11.5,
+        ),
+      ),
+      const SizedBox(height: 9),
+      Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        children: [
+          _roleBadge(u.role),
+          if (u.createdAt != null) _joinedBadge(u.createdAt!),
+        ],
+      ),
+    ],
+  );
+
+  Widget _buildRight(BuildContext context, AdminUserModel u) => Column(
+    crossAxisAlignment: CrossAxisAlignment.end,
+    children: [
+      _activeStatusPill(u.isActive),
+      const SizedBox(height: 10),
+      GestureDetector(
+        onTap: () => _openQuickMenu(context, u),
+        child: Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
+          ),
+          child: Icon(
+            Icons.more_vert_rounded,
+            color: _muted,
+            size: 16,
+          ),
+        ),
+      ),
+    ],
+  );
+
+  Widget _roleBadge(String role) {
+    final isAdmin = role == 'admin';
+    final color = isAdmin ? _orange : _purple;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isAdmin ? Icons.shield_rounded : Icons.person_rounded,
+            color: color,
+            size: 10,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            role[0].toUpperCase() + role.substring(1),
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _joinedBadge(DateTime date) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.04),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.calendar_today_rounded,
+          color: _muted,
+          size: 9,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          DateFormat('MMM yy').format(date),
+          style: const TextStyle(
+            color: Color(0xFF8B98A8),
+            fontSize: 9.5,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _activeStatusPill(bool isActive) {
+    final color = isActive ? _green : _muted;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+        boxShadow: isActive
+            ? [BoxShadow(color: color.withValues(alpha: 0.22), blurRadius: 8)]
+            : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            isActive ? 'Active' : 'Inactive',
+            style: TextStyle(
+              color: color,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openQuickMenu(BuildContext context, AdminUserModel u) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _UserQuickMenu(
+        user: u,
+        onEdit: widget.onEdit,
+        onToggle: widget.onToggle,
+        onDelete: widget.onDelete,
+      ),
+    );
+  }
+}
+
+// ── User quick menu ───────────────────────────────────────────────────────────
+
+class _UserQuickMenu extends StatelessWidget {
+  const _UserQuickMenu({
+    required this.user,
+    required this.onEdit,
+    required this.onToggle,
+    required this.onDelete,
+  });
+  final AdminUserModel user;
+  final VoidCallback onEdit;
+  final VoidCallback onToggle;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final accentColor = user.isActive ? _cyan : _muted;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 36),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D1520),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          // User header
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      accentColor.withValues(alpha: 0.22),
+                      accentColor.withValues(alpha: 0.06),
+                    ],
+                  ),
+                  border: Border.all(
+                    color: accentColor.withValues(alpha: 0.50),
+                    width: 1.5,
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    user.initials,
+                    style: TextStyle(
+                      color: accentColor,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user.fullName,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFFF5F7FA),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      user.email,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF8B98A8),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Divider(color: Colors.white.withValues(alpha: 0.07), height: 1),
+          const SizedBox(height: 16),
+          // Actions
+          _menuItem(
+            context,
+            icon: Icons.edit_rounded,
+            label: 'Edit User',
+            color: _cyan,
+            onTap: () {
+              Navigator.pop(context);
+              onEdit();
+            },
+          ),
+          const SizedBox(height: 10),
+          _menuItem(
+            context,
+            icon: user.isActive
+                ? Icons.block_rounded
+                : Icons.check_circle_rounded,
+            label: user.isActive ? 'Disable User' : 'Enable User',
+            color: user.isActive ? _red : _green,
+            onTap: () {
+              Navigator.pop(context);
+              onToggle();
+            },
+          ),
+          const SizedBox(height: 10),
+          _menuItem(
+            context,
+            icon: Icons.delete_rounded,
+            label: 'Delete User',
+            color: _red,
+            onTap: () {
+              Navigator.pop(context);
+              onDelete();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _menuItem(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) =>
+      GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withValues(alpha: 0.18)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(icon, color: color, size: 18),
+              ),
+              const SizedBox(width: 14),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const Spacer(),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: color.withValues(alpha: 0.45),
+                size: 18,
+              ),
+            ],
+          ),
+        ),
+      );
 }
 
 // ── User detail sheet ─────────────────────────────────────────────────────────
@@ -2076,6 +2782,8 @@ class _SubTile extends StatelessWidget {
       decoration: _adminDeco(color, radius: 16),
       child: Row(
         children: [
+          _subLogo(color),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2135,6 +2843,38 @@ class _SubTile extends StatelessWidget {
       ),
     );
   }
+
+  Widget _subLogo(Color color) {
+    final logoUrl = sub.serviceLogoUrl;
+    final fallback = Center(
+      child: Text(
+        sub.serviceName.isNotEmpty ? sub.serviceName[0].toUpperCase() : '?',
+        style: const TextStyle(
+          color: _white,
+          fontSize: 16,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.24)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: logoUrl != null && logoUrl.isNotEmpty
+          ? Image.network(
+              logoUrl,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => fallback,
+            )
+          : fallback,
+    );
+  }
 }
 
 // ── Service card ──────────────────────────────────────────────────────────────
@@ -2149,6 +2889,9 @@ class _ServiceCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
+  bool get _hasLogo =>
+      service.logoUrl != null && service.logoUrl!.startsWith('http');
+
   @override
   Widget build(BuildContext context) => Container(
     margin: const EdgeInsets.only(bottom: 12),
@@ -2158,46 +2901,10 @@ class _ServiceCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _cyan.withValues(alpha: 0.12),
-                border: Border.all(color: _cyan.withValues(alpha: 0.28)),
-              ),
-              child: Center(
-                child:
-                    service.logoUrl != null &&
-                        service.logoUrl!.startsWith('http')
-                    ? ClipOval(
-                        child: Image.network(
-                          service.logoUrl!,
-                          width: 28,
-                          height: 28,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Text(
-                            service.initials,
-                            style: const TextStyle(
-                              color: _cyan,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                      )
-                    : Text(
-                        service.initials,
-                        style: const TextStyle(
-                          color: _cyan,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-              ),
-            ),
-            const SizedBox(width: 12),
+            _buildLogoAvatar(),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2214,7 +2921,8 @@ class _ServiceCard extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     [
-                      if (service.categoryName.isNotEmpty) service.categoryName,
+                      if (service.categoryName.isNotEmpty)
+                        service.categoryName,
                       service.billingCycle,
                     ].join(' · '),
                     style: const TextStyle(color: _muted, fontSize: 11),
@@ -2222,6 +2930,14 @@ class _ServiceCard extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+            const SizedBox(width: 8),
+            // Edit / Delete
+            Column(
+              children: [
+                _iconBtn(Icons.edit_rounded, _cyan, onEdit),
+                _iconBtn(Icons.delete_rounded, _red, onDelete),
+              ],
             ),
           ],
         ),
@@ -2235,28 +2951,86 @@ class _ServiceCard extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 12),
-        Row(
-          children: [
-            _smallBadge(
-              '\$${service.defaultAmount.toStringAsFixed(2)}/${service.billingCycle.toLowerCase()}',
-              _orange,
-            ),
-            const Spacer(),
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              onPressed: onEdit,
-              icon: const Icon(Icons.edit_rounded, color: _cyan, size: 19),
-            ),
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              onPressed: onDelete,
-              icon: const Icon(Icons.delete_rounded, color: _red, size: 19),
-            ),
-          ],
+        _smallBadge(
+          '\$${service.defaultAmount.toStringAsFixed(2)}/${service.billingCycle.toLowerCase()}',
+          _orange,
         ),
       ],
     ),
   );
+
+  Widget _buildLogoAvatar() {
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: _hasLogo
+            ? Colors.white.withValues(alpha: 0.06)
+            : _cyan.withValues(alpha: 0.10),
+        border: Border.all(color: _cyan.withValues(alpha: 0.22), width: 1.0),
+        boxShadow: [
+          BoxShadow(
+            color: _cyan.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(15),
+        child: _hasLogo ? _networkLogo() : _initialsWidget(),
+      ),
+    );
+  }
+
+  Widget _networkLogo() => Image.network(
+    service.logoUrl!,
+    fit: BoxFit.contain,
+    width: 56,
+    height: 56,
+    loadingBuilder: (_, child, progress) {
+      if (progress == null) return child;
+      return Center(
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            strokeWidth: 1.5,
+            color: _cyan.withValues(alpha: 0.50),
+          ),
+        ),
+      );
+    },
+    errorBuilder: (_, __, ___) => _initialsWidget(),
+  );
+
+  Widget _initialsWidget() => Center(
+    child: Text(
+      service.initials,
+      style: const TextStyle(
+        color: _cyan,
+        fontSize: 20,
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+  );
+
+  Widget _iconBtn(IconData icon, Color color, VoidCallback onTap) =>
+      GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 32,
+          height: 32,
+          margin: const EdgeInsets.only(bottom: 4),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.09),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withValues(alpha: 0.20)),
+          ),
+          child: Icon(icon, color: color, size: 16),
+        ),
+      );
 }
 
 // ── Metric card ───────────────────────────────────────────────────────────────

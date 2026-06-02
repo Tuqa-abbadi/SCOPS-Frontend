@@ -41,10 +41,54 @@ class AuthApiService {
     );
   }
 
+  Future<Response<dynamic>> verifyEmail({
+    required String email,
+    required String token,
+  }) {
+    return _dio.post(
+      ApiConstants.verifyEmail,
+      data: {
+        'email': email,
+        'token': token,
+        'code': token,
+      },
+      options: Options(contentType: Headers.formUrlEncodedContentType),
+    );
+  }
+
   Future<Response<dynamic>> forgotPassword({required String email}) {
     return _dio.post(
       ApiConstants.forgotPassword,
       data: {'email': email},
+      options: Options(contentType: Headers.formUrlEncodedContentType),
+    );
+  }
+
+  Future<Response<dynamic>> verifyResetCode({
+    required String email,
+    required String token,
+  }) {
+    return _dio.post(
+      ApiConstants.verifyResetCode,
+      data: {'email': email, 'token': token},
+      options: Options(contentType: Headers.formUrlEncodedContentType),
+    );
+  }
+
+  Future<Response<dynamic>> resetPassword({
+    required String email,
+    required String token,
+    required String password,
+    required String passwordConfirmation,
+  }) {
+    return _dio.post(
+      ApiConstants.resetPassword,
+      data: {
+        'email': email,
+        'token': token,
+        'password': password,
+        'password_confirmation': passwordConfirmation,
+      },
       options: Options(contentType: Headers.formUrlEncodedContentType),
     );
   }
@@ -59,7 +103,6 @@ class AuthApiService {
       connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 30),
       sendTimeout: const Duration(seconds: 30),
-      headers: const {'ngrok-skip-browser-warning': 'true'},
     ));
     return freshDio.post(
       ApiConstants.refreshToken,

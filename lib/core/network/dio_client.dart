@@ -39,6 +39,24 @@ class DioClient {
           logPrint: (o) => print(o),
         ),
       );
+      // Logs the final encoded body and content-type actually sent over the wire.
+      dio.interceptors.add(InterceptorsWrapper(
+        onRequest: (options, handler) {
+          print('[DIO-DEBUG] uri=${options.uri}');
+          print('[DIO-DEBUG] content-type=${options.contentType}');
+          print('[DIO-DEBUG] headers=${options.headers}');
+          print('[DIO-DEBUG] data=${options.data}');
+          handler.next(options);
+        },
+        onResponse: (response, handler) {
+          print('[DIO-DEBUG] response=${response.statusCode} ${response.data}');
+          handler.next(response);
+        },
+        onError: (err, handler) {
+          print('[DIO-DEBUG] error=${err.response?.statusCode} ${err.response?.data}');
+          handler.next(err);
+        },
+      ));
       return true;
     }());
 
@@ -53,11 +71,11 @@ class DioClient {
   static BaseOptions _baseOptions(String baseUrl) {
     return BaseOptions(
       baseUrl: baseUrl,
+      contentType: 'application/json',
       connectTimeout: const Duration(seconds: 20),
       receiveTimeout: const Duration(seconds: 20),
       sendTimeout: const Duration(seconds: 20),
       headers: const {
-        'Content-Type': 'application/json',
         'Accept': 'application/json',
         'ngrok-skip-browser-warning': 'true',
       },

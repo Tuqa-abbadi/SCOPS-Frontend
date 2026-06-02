@@ -25,6 +25,7 @@ class SubscriptionAdded extends SubscriptionEvent {
   const SubscriptionAdded({
     required this.serviceName,
     required this.serviceIcon,
+    this.serviceLogoUrl,
     required this.plan,
     required this.billingCycle,
     required this.amount,
@@ -34,25 +35,30 @@ class SubscriptionAdded extends SubscriptionEvent {
     this.serviceId,
     this.planId,
     this.cardApiId,
+    this.paymentId,
     this.priority = 'medium',
+    this.serviceAccountEmail,
   });
 
   final String serviceName;
   final String serviceIcon;
+  final String? serviceLogoUrl;
   final String plan;
   final String billingCycle;
   final double amount;
   final DateTime nextRenewal;
   final String cardId;
   final int reminderDays;
-  // API fields (null-safe – only available when coming from the service browser)
   final int? serviceId;
   final int? planId;
   final int? cardApiId;
+  final int? paymentId;
   final String priority;
+  final String? serviceAccountEmail;
 
   @override
-  List<Object?> get props => [serviceName, plan, serviceId];
+  List<Object?> get props =>
+      [serviceName, serviceLogoUrl, plan, serviceId, paymentId, serviceAccountEmail];
 }
 
 // ── API actions ───────────────────────────────────────────────────────────────
@@ -119,4 +125,10 @@ class SubscriptionDeleted extends SubscriptionEvent {
   final String id;
   @override
   List<Object?> get props => [id];
+}
+
+/// Resets the bloc to its initial state (dispatched on logout so the next
+/// login always fetches fresh data for the new user).
+class SubscriptionReset extends SubscriptionEvent {
+  const SubscriptionReset();
 }

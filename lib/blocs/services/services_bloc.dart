@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/network/dio_client.dart';
+import '../../core/utils/media_url.dart';
 import '../../models/category_model.dart';
 import '../../models/service_plan_model.dart';
 import '../../services/categories_api_service.dart';

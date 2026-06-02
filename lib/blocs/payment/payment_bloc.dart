@@ -29,7 +29,11 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
   ) async {
     emit(const PaymentIntentLoading());
 
-    final result = await _repository.createPaymentIntent(event.serviceId);
+    final result = await _repository.createPaymentIntent(
+      event.serviceId,
+      planId: event.planId,
+      serviceAccountEmail: event.serviceAccountEmail,
+    );
 
     if (result.success) {
       _log('Intent created: paymentId=${result.intent!.paymentId}');
@@ -66,7 +70,10 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
 
     if (result.success) {
       _log('Payment confirmed: paymentId=${event.paymentId}');
-      emit(const PaymentSuccess());
+      emit(PaymentSuccess(
+        paymentId: event.paymentId,
+        receipt: result.receipt,
+      ));
     } else {
       _log('Confirm error: ${result.message}');
       emit(PaymentFailure(message: result.message));

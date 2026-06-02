@@ -15,6 +15,7 @@ class SubscriptionApiModel extends Equatable {
     required this.reminderDays,
     required this.status,
     required this.priority,
+    this.serviceAccountEmail,
     this.createdAt,
     this.updatedAt,
   });
@@ -31,6 +32,7 @@ class SubscriptionApiModel extends Equatable {
   final int reminderDays;
   final String status;   // active | cancelled | paused
   final String priority; // high | medium | low
+  final String? serviceAccountEmail;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -49,6 +51,8 @@ class SubscriptionApiModel extends Equatable {
       reminderDays: _parseInt(json['reminder_days']) ?? 3,
       status: json['status'] as String? ?? 'active',
       priority: json['priority'] as String? ?? 'medium',
+      serviceAccountEmail: json['service_account_email'] as String? ??
+          json['serviceAccountEmail'] as String?,
       createdAt: _parseDateTime(json['created_at']),
       updatedAt: _parseDateTime(json['updated_at']),
     );

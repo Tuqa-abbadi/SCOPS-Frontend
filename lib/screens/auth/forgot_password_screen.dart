@@ -4,9 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../blocs/auth/auth_bloc.dart';
+import 'enter_code_screen.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
-  const ForgotPasswordScreen({super.key});
+  const ForgotPasswordScreen({
+    super.key,
+    this.initialEmail,
+    this.useKnownEmail = false,
+    this.autoSubmit = false,
+  });
+
+  final String? initialEmail;
+  final bool useKnownEmail;
+  final bool autoSubmit;
 
   @override
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
@@ -14,10 +24,27 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final emailController = TextEditingController();
+  bool _didAutoSubmit = false;
 
   static const _cyan = Color(0xFF18E8F2);
   static const _orange = Color(0xFFFF5A14);
   static const _dark = Color(0xFF020812);
+
+  @override
+  void initState() {
+    super.initState();
+    emailController.text = widget.initialEmail?.trim() ?? '';
+
+    if (widget.autoSubmit && emailController.text.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _didAutoSubmit) return;
+        _didAutoSubmit = true;
+        context.read<ForgotPasswordBloc>().add(
+          ForgotPasswordSubmitted(email: emailController.text.trim()),
+        );
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -59,17 +86,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
         ),
         const Spacer(),
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text(
-            'Login',
-            style: TextStyle(
-              color: _cyan,
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
+        if (!widget.useKnownEmail)
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Login',
+              style: TextStyle(
+                color: _cyan,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -84,10 +112,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       padding: const EdgeInsets.all(1),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: _cyan.withOpacity(0.22),
-          width: 1,
-        ),
+        border: Border.all(color: _cyan.withOpacity(0.22), width: 1),
         boxShadow: [
           BoxShadow(
             color: _cyan.withOpacity(0.08),
@@ -152,10 +177,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ? null
             : () {
                 context.read<ForgotPasswordBloc>().add(
-                      ForgotPasswordSubmitted(
-                        email: emailController.text.trim(),
-                      ),
-                    );
+                  ForgotPasswordSubmitted(email: emailController.text.trim()),
+                );
               },
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
@@ -174,9 +197,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   color: Colors.black,
                 ),
               )
-            : const Text(
-                'Send Reset Link',
-                style: TextStyle(
+            : Text(
+                widget.useKnownEmail
+                    ? 'Send Verification Code'
+                    : 'Send Reset Link',
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w900,
                 ),
@@ -198,10 +223,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           decoration: BoxDecoration(
             color: const Color(0xFF07121C).withOpacity(0.70),
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(
-              color: _cyan.withOpacity(0.25),
-              width: 1,
-            ),
+            border: Border.all(color: _cyan.withOpacity(0.25), width: 1),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.40),
@@ -217,11 +239,47 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
           child: Column(
             children: [
-              _inputField(
-                controller: emailController,
-                hint: 'Email address',
-                icon: Icons.email_outlined,
-              ),
+              if (widget.useKnownEmail)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF07121C),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: _cyan.withOpacity(0.22)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.email_outlined,
+                        color: Colors.white.withOpacity(0.55),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          emailController.text,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFFE9F3F4),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                _inputField(
+                  controller: emailController,
+                  hint: 'Email address',
+                  icon: Icons.email_outlined,
+                ),
               if (forgotPasswordState.errorMessage != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 14),
@@ -259,7 +317,22 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<ForgotPasswordBloc, AuthState>(
+    return BlocConsumer<ForgotPasswordBloc, AuthState>(
+      listenWhen: (previous, current) =>
+          current is ForgotPasswordState &&
+          current.successMessage != null &&
+          (previous is! ForgotPasswordState || previous.successMessage == null),
+      listener: (context, state) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BlocProvider.value(
+              value: context.read<ResetPasswordBloc>(),
+              child: EnterCodeScreen(email: emailController.text.trim()),
+            ),
+          ),
+        );
+      },
       builder: (context, state) {
         final forgotPasswordState = state is ForgotPasswordState
             ? state
@@ -315,9 +388,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        'Reset your password',
-                        style: TextStyle(
+                      Text(
+                        widget.useKnownEmail
+                            ? 'Verify your account'
+                            : 'Reset your password',
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 15,
                           fontWeight: FontWeight.w800,

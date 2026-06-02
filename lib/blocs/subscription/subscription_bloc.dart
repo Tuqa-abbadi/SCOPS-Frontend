@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/network/dio_client.dart';
+import '../../core/utils/media_url.dart';
 import '../../models/subscription_model.dart';
 import '../../services/subscriptions_api_service.dart';
 import '../../services/services_api_service.dart';
@@ -32,13 +33,21 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
     on<SubscriptionCancelRequested>(_onCancelRequested);
     on<SubscriptionPauseRequested>(_onPauseRequested);
     on<SubscriptionResumeRequested>(_onResumeRequested);
+    on<SubscriptionReset>(_onReset);
   }
 
   final SubscriptionsApiService _subscriptionsService;
   final ServicesApiService _servicesService;
 
   // serviceId → (name, icon emoji)
-  final Map<int, (String, String)> _serviceCache = {};
+  final Map<int, _ServiceDisplay> _serviceCache = {};
+
+  // ── Reset (on logout) ──────────────────────────────────────────────────────
+
+  void _onReset(SubscriptionReset _, Emitter<SubscriptionState> emit) {
+    _serviceCache.clear();
+    emit(const SubscriptionInitial());
+  }
 
   // ── Initial load ───────────────────────────────────────────────────────────
 
@@ -106,27 +115,14 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
     final current =
         state is SubscriptionData ? state as SubscriptionData : null;
 
-    // If we have no service_id we cannot POST to the API.
-    // Gracefully store locally so the UI keeps working.
     if (event.serviceId == null || event.serviceId == 0) {
-      _log('SubscriptionAdded: no serviceId – storing locally');
-      final sub = SubscriptionModel(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        apiId: DateTime.now().millisecondsSinceEpoch,
-        serviceId: 0,
-        serviceName: event.serviceName,
-        serviceIcon: event.serviceIcon,
-        plan: event.plan,
-        billingCycle: _capitalizeCycle(event.billingCycle),
-        amount: event.amount,
-        nextRenewal: event.nextRenewal,
-        cardId: event.cardId,
-        reminderDays: event.reminderDays,
-        priority: event.priority,
-        startDate: DateTime.now(),
-      );
-      final List<SubscriptionModel> subs = [...(current?.subscriptions ?? []), sub];
-      emit(SubscriptionData(subscriptions: subs));
+      _log('SubscriptionAdded: missing serviceId; cannot create remotely');
+      const msg = 'Service details are missing. Please choose a service again.';
+      if (current != null) {
+        emit(current.copyWith(isLoading: false, actionError: msg));
+      } else {
+        emit(const SubscriptionError(message: msg));
+      }
       return;
     }
 
@@ -137,23 +133,29 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
       final renewal = _calcRenewalDateStr(billingCycleLower);
 
+      // Payment was already created and confirmed by CheckoutSubscriptionScreen
+      // via PaymentBloc. We just record the subscription with the payment_id.
       await _subscriptionsService.createSubscription(
         serviceId: event.serviceId!,
         planId: event.planId,
         cardId: event.cardApiId,
+        paymentId: event.paymentId,
         amount: event.amount,
         billingCycle: billingCycleLower,
         startDate: today,
         renewalDate: renewal,
         reminderDays: event.reminderDays,
         priority: event.priority,
+        serviceAccountEmail: event.serviceAccountEmail,
       );
 
-      // Cache service name/icon for future display
-      _serviceCache[event.serviceId!] = (event.serviceName, event.serviceIcon);
+      _serviceCache[event.serviceId!] = _ServiceDisplay(
+        name: event.serviceName,
+        icon: event.serviceIcon,
+        logoUrl: event.serviceLogoUrl,
+      );
 
-      await _fetchAndEmit(
-          emit, previous: current?.subscriptions ?? []);
+      await _fetchAndEmit(emit, previous: current?.subscriptions ?? []);
     } on DioException catch (e) {
       _log('Create error (Dio): $e');
       final msg = _dioError(e);
@@ -279,8 +281,13 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
         final id = _parseInt(map['id'] ?? map['service_id']);
         final name = map['name'] as String? ?? '';
         final icon = map['icon'] as String? ?? _iconForName(name);
+        final logoUrl = resolveLogoUrlFromJson(map);
         if (id != null && name.isNotEmpty) {
-          _serviceCache[id] = (name, icon);
+          _serviceCache[id] = _ServiceDisplay(
+            name: name,
+            icon: icon,
+            logoUrl: logoUrl,
+          );
         }
       }
       _log('Service cache: ${_serviceCache.length} entries');
@@ -298,8 +305,25 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
       final api = SubscriptionApiModel.fromJson(json);
 
       final cached = _serviceCache[api.serviceId];
-      final serviceName = cached?.$1 ?? 'Service #${api.serviceId}';
-      final serviceIcon = cached?.$2 ?? _iconForName('');
+      String? nestedServiceName;
+      String? nestedServiceIcon;
+      String? nestedServiceLogoUrl;
+      final serviceField = json['service'];
+      if (serviceField is Map) {
+        final serviceMap = serviceField.map((k, v) => MapEntry(k.toString(), v));
+        nestedServiceName = serviceMap['name']?.toString();
+        nestedServiceIcon = serviceMap['icon']?.toString();
+        nestedServiceLogoUrl = resolveLogoUrlFromJson(serviceMap);
+      }
+
+      final serviceName = nestedServiceName?.isNotEmpty == true
+          ? nestedServiceName!
+          : cached?.name ?? 'Service #${api.serviceId}';
+      final serviceIcon = nestedServiceIcon?.isNotEmpty == true
+          ? nestedServiceIcon!
+          : cached?.icon ?? _iconForName('');
+      final serviceLogoUrl =
+          nestedServiceLogoUrl ?? resolveLogoUrlFromJson(json) ?? cached?.logoUrl;
 
       final billingCycle = _capitalizeCycle(api.billingCycle);
       final plan = api.planId != null ? 'Plan #${api.planId}' : billingCycle;
@@ -312,6 +336,7 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
         cardApiId: api.cardId,
         serviceName: serviceName,
         serviceIcon: serviceIcon,
+        serviceLogoUrl: serviceLogoUrl,
         plan: plan,
         billingCycle: billingCycle,
         amount: api.amount,
@@ -321,6 +346,7 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
         status: _parseStatus(api.status),
         priority: api.priority,
         startDate: api.startDate,
+        serviceAccountEmail: api.serviceAccountEmail,
       );
     } catch (e) {
       _log('Model conversion error: $e');
@@ -454,4 +480,16 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
     if (data is Map) return data['message'] as String? ?? 'Something went wrong.';
     return 'Something went wrong. Please try again.';
   }
+}
+
+class _ServiceDisplay {
+  const _ServiceDisplay({
+    required this.name,
+    required this.icon,
+    this.logoUrl,
+  });
+
+  final String name;
+  final String icon;
+  final String? logoUrl;
 }

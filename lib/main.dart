@@ -65,6 +65,13 @@ class ScopsApp extends StatelessWidget {
         BlocProvider<ForgotPasswordBloc>(
           create: (_) => ForgotPasswordBloc(authRepository: authRepository),
         ),
+        BlocProvider<ResetPasswordBloc>(
+          create: (_) => ResetPasswordBloc(authRepository: authRepository),
+        ),
+        BlocProvider<EmailVerificationBloc>(
+          create: (_) =>
+              EmailVerificationBloc(authRepository: authRepository),
+        ),
         BlocProvider<LogoutBloc>(
           create: (_) => LogoutBloc(authRepository: authRepository),
         ),

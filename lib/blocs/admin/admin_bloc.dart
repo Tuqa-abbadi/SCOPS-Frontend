@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/network/dio_client.dart';
+import '../../core/utils/media_url.dart';
 import '../../services/admin_api_service.dart';
 
 part 'admin_event.dart';
@@ -56,6 +59,7 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     AdminStatisticsModel? stats;
     List<AdminUserModel> users = [];
     List<AdminServiceModel> services = [];
+    List<AdminCategoryModel> categories = [];
     String? loadError;
 
     await Future.wait([
@@ -79,6 +83,15 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
         _log('Services error: $e');
         loadError ??= _msgFor(e);
       }),
+      _api.getCategories().then((r) {
+        categories = _extractList(r.data)
+            .whereType<Map>()
+            .map((m) => AdminCategoryModel.fromJson(m.map((k, v) => MapEntry(k.toString(), v))))
+            .toList();
+        _log('Categories loaded: ${categories.length}');
+      }).catchError((Object e) {
+        _log('Categories error: $e');
+      }),
     ]);
 
     if (loadError != null && users.isEmpty && services.isEmpty && stats == null) {
@@ -89,6 +102,7 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
         statistics: stats,
         users: users,
         services: services,
+        categories: categories,
         // Preserve subscription view across refresh
         viewingUserId: prev?.viewingUserId,
         viewingUserSubscriptions: prev?.viewingUserSubscriptions ?? [],
@@ -253,7 +267,7 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
         billingCycle: event.billingCycle,
         description: event.description,
         categoryId: event.categoryId,
-        logoUrl: event.logoUrl,
+        logoFile: event.logoFile,
       );
       _log('Service created: ${event.name}');
       await _refreshServices(emit, success: 'Service created successfully.');
@@ -278,7 +292,7 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
         billingCycle: event.billingCycle,
         description: event.description,
         categoryId: event.categoryId,
-        logoUrl: event.logoUrl,
+        logoFile: event.logoFile,
       );
       _log('Service updated: ${event.id}');
       await _refreshServices(emit, success: 'Service updated successfully.');
@@ -356,7 +370,11 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
       final services = _parseServices(_extractList(r.data));
       final cur = state as AdminData?;
       if (cur != null) {
-        emit(cur.copyWith(services: services, isActionLoading: false, actionSuccess: success));
+        emit(cur.copyWith(
+          services: services,
+          isActionLoading: false,
+          actionSuccess: success,
+        ));
       }
     } catch (e) {
       _emitActionError(emit, 'Action done but failed to refresh services.');

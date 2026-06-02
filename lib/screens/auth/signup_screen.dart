@@ -1,10 +1,11 @@
 ﻿import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/services.dart';
 
 import '../../blocs/auth/auth_bloc.dart';
+import 'enter_code_screen.dart';
 import 'login_screen.dart';
-import '../dashboard/dashboard_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -130,6 +131,8 @@ class _SignupScreenState extends State<SignupScreen> {
     bool showPassword = false,
     VoidCallback? onTogglePassword,
     TextInputType keyboardType = TextInputType.text,
+    List<TextInputFormatter>? inputFormatters,
+    String? prefixText,
   }) {
     return Container(
       height: 58,
@@ -152,6 +155,7 @@ class _SignupScreenState extends State<SignupScreen> {
         controller: controller,
         obscureText: isPassword && !showPassword,
         keyboardType: keyboardType,
+        inputFormatters: inputFormatters,
         style: const TextStyle(
           color: Color(0xFFE9F3F4),
           fontSize: 13,
@@ -168,6 +172,12 @@ class _SignupScreenState extends State<SignupScreen> {
             icon,
             color: Colors.white.withOpacity(0.55),
             size: 20,
+          ),
+          prefixText: prefixText,
+          prefixStyle: const TextStyle(
+            color: Color(0xFFE9F3F4),
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
           ),
           suffixIcon: isPassword
               ? IconButton(
@@ -190,6 +200,60 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _phoneInputField() {
+    return Row(
+      children: [
+        Container(
+          height: 58,
+          padding: const EdgeInsets.all(1),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: _cyan.withOpacity(0.24),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: _cyan.withOpacity(0.08),
+                blurRadius: 18,
+                spreadRadius: -5,
+              ),
+            ],
+          ),
+          child: Container(
+            width: 82,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFF07121C),
+              borderRadius: BorderRadius.circular(17),
+            ),
+            child: const Text(
+              '+962',
+              style: TextStyle(
+                color: Color(0xFFE9F3F4),
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _inputField(
+            controller: phoneController,
+            hint: '10 digits',
+            icon: Icons.phone_outlined,
+            keyboardType: TextInputType.phone,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -223,12 +287,7 @@ class _SignupScreenState extends State<SignupScreen> {
           keyboardType: TextInputType.emailAddress,
         );
       case 2:
-        return _inputField(
-          controller: phoneController,
-          hint: 'Phone number',
-          icon: Icons.phone_outlined,
-          keyboardType: TextInputType.phone,
-        );
+        return _phoneInputField();
       default:
         return _inputField(
           controller: passwordController,
@@ -448,9 +507,25 @@ class _SignupScreenState extends State<SignupScreen> {
     return BlocConsumer<SignupBloc, AuthState>(
       listener: (context, state) {
         if (state is SignupSuccess) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: _cyan,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => const DashboardScreen()),
+            MaterialPageRoute(
+              builder: (_) => BlocProvider.value(
+                value: context.read<EmailVerificationBloc>(),
+                child: EnterCodeScreen(
+                  email: state.email,
+                  isEmailVerification: true,
+                  password: passwordController.text,
+                ),
+              ),
+            ),
           );
         } else if (state is SignupGoBack) {
           Navigator.pop(context);

@@ -17,11 +17,24 @@ class CardsApiService {
   Future<Response<dynamic>> saveStripeCard({
     required String paymentMethodId,
     required String cardHolderName,
-  }) =>
-      _dio.post(ApiConstants.cards, data: {
-        'stripe_payment_method_id': paymentMethodId,
-        'card_holder_name': cardHolderName,
-      });
+  }) {
+    final normalizedPaymentMethodId = paymentMethodId.trim();
+    final normalizedCardHolderName = cardHolderName.trim();
+
+    final data = {
+      'stripe_payment_method_id': normalizedPaymentMethodId,
+      'card_holder_name': normalizedCardHolderName,
+    };
+
+    // ignore: avoid_print
+    print('[CardsApiService] POST ${ApiConstants.cards} data=$data');
+
+    return _dio.post(
+      ApiConstants.cards,
+      data: data,
+      options: Options(contentType: Headers.jsonContentType),
+    );
+  }
 
   Future<Response<dynamic>> deleteCard(String cardId) =>
       _dio.delete(ApiConstants.cardById(cardId));

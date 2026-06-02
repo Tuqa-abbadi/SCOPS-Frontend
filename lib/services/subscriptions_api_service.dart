@@ -34,12 +34,14 @@ class SubscriptionsApiService {
     required int serviceId,
     int? planId,
     int? cardId,
+    int? paymentId,
     required double amount,
     required String billingCycle,
     required String startDate,
     required String renewalDate,
     required int reminderDays,
     String priority = 'medium',
+    String? serviceAccountEmail,
   }) {
     final body = <String, dynamic>{
       'service_id': serviceId,
@@ -52,6 +54,10 @@ class SubscriptionsApiService {
     };
     if (planId != null) body['plan_id'] = planId;
     if (cardId != null) body['card_id'] = cardId;
+    if (paymentId != null) body['payment_id'] = paymentId;
+    if (serviceAccountEmail != null && serviceAccountEmail.isNotEmpty) {
+      body['service_account_email'] = serviceAccountEmail;
+    }
     return _dio.post(ApiConstants.subscriptions, data: body);
   }
 

@@ -98,7 +98,7 @@ class AdminServiceCreateRequested extends AdminEvent {
     required this.billingCycle,
     this.description,
     this.categoryId,
-    this.logoUrl,
+    this.logoFile,
   });
 
   final String name;
@@ -106,7 +106,7 @@ class AdminServiceCreateRequested extends AdminEvent {
   final String billingCycle;
   final String? description;
   final int? categoryId;
-  final String? logoUrl;
+  final File? logoFile;
 
   @override
   List<Object?> get props => [name];
@@ -120,7 +120,7 @@ class AdminServiceUpdateRequested extends AdminEvent {
     this.billingCycle,
     this.description,
     this.categoryId,
-    this.logoUrl,
+    this.logoFile,
   });
 
   final int id;
@@ -129,7 +129,7 @@ class AdminServiceUpdateRequested extends AdminEvent {
   final String? billingCycle;
   final String? description;
   final int? categoryId;
-  final String? logoUrl;
+  final File? logoFile;
 
   @override
   List<Object?> get props => [id];

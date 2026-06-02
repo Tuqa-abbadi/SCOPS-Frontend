@@ -136,10 +136,21 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
                   color: _gold.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Center(
-                  child: Text(widget.subscription.serviceIcon,
-                      style: const TextStyle(fontSize: 22)),
-                ),
+                clipBehavior: Clip.antiAlias,
+                child: widget.subscription.serviceLogoUrl != null &&
+                        widget.subscription.serviceLogoUrl!.isNotEmpty
+                    ? Image.network(
+                        widget.subscription.serviceLogoUrl!,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Center(
+                          child: Text(widget.subscription.serviceIcon,
+                              style: const TextStyle(fontSize: 22)),
+                        ),
+                      )
+                    : Center(
+                        child: Text(widget.subscription.serviceIcon,
+                            style: const TextStyle(fontSize: 22)),
+                      ),
               ),
               const SizedBox(width: 14),
               Expanded(child: Column(

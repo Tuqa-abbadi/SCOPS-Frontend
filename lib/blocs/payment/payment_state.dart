@@ -42,7 +42,16 @@ class PaymentConfirming extends PaymentState {
 
 /// Payment confirmed successfully.
 class PaymentSuccess extends PaymentState {
-  const PaymentSuccess();
+  const PaymentSuccess({
+    required this.paymentId,
+    this.receipt,
+  });
+
+  final int paymentId;
+  final Map<String, dynamic>? receipt;
+
+  @override
+  List<Object?> get props => [paymentId, receipt];
 }
 
 /// User pressed "No" in the confirmation dialog.

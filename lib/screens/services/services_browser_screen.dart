@@ -7,6 +7,7 @@ import '../../blocs/services/services_bloc.dart';
 import '../../blocs/subscription/subscription_bloc.dart';
 import '../../blocs/wallet/wallet_bloc.dart';
 import '../reviews/write_review_sheet.dart';
+import '../subscription/checkout_subscription_screen.dart';
 
 // ── Billing cycle label helpers ───────────────────────────────────────────────
 
@@ -654,6 +655,8 @@ class _DetailSheetState extends State<_DetailSheet> {
   static const _white  = Colors.white;
   static const _muted  = Color(0xFF9BA4B0);
 
+  PaymentBloc? _paymentBloc;
+
   int? get _serviceIdInt => int.tryParse(widget.svc.id);
 
   @override
@@ -667,8 +670,14 @@ class _DetailSheetState extends State<_DetailSheet> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _paymentBloc ??= context.read<PaymentBloc>();
+  }
+
+  @override
   void dispose() {
-    context.read<PaymentBloc>().add(const PaymentReset());
+    _paymentBloc?.add(const PaymentReset());
     super.dispose();
   }
 
@@ -761,37 +770,7 @@ class _DetailSheetState extends State<_DetailSheet> {
   @override
   Widget build(BuildContext context) {
     final svc = widget.svc;
-    return BlocListener<PaymentBloc, PaymentState>(
-      listener: (context, state) {
-        if (state is PaymentIntentReady) {
-          _showConfirmDialog(context, state);
-        } else if (state is PaymentSuccess) {
-          // Capture messenger before pop — context is deactivated after pop.
-          final messenger = ScaffoldMessenger.of(context);
-          Navigator.of(context).pop();
-          messenger.showSnackBar(
-            SnackBar(
-              content: const Text('Payment confirmed successfully!'),
-              backgroundColor: _cyan.withValues(alpha: 0.90),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-          );
-        } else if (state is PaymentFailure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: _orange.withValues(alpha: 0.90),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-          );
-          context.read<PaymentBloc>().add(const PaymentReset());
-        }
-      },
-      child: Container(
+    return Container(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.88,
         ),
@@ -883,7 +862,6 @@ class _DetailSheetState extends State<_DetailSheet> {
           ),
         ],
         ),
-      ),
     );
   }
 
@@ -1496,9 +1474,29 @@ class _DetailSheetState extends State<_DetailSheet> {
                 : () {
                     final sid = _serviceIdInt;
                     if (sid != null) {
-                      context
-                          .read<PaymentBloc>()
-                          .add(PaymentIntentRequested(sid));
+                      final svcState = context.read<ServicesBloc>().state;
+                      final selectedPlan = svcState is ServicesDataLoaded
+                          ? svcState.detailPlans
+                              .where((p) => p.id == svcState.selectedPlanId)
+                              .firstOrNull
+                          : null;
+                      Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => MultiBlocProvider(
+                          providers: [
+                            BlocProvider.value(
+                                value: context.read<ServicesBloc>()),
+                            BlocProvider.value(
+                                value: context.read<SubscriptionBloc>()),
+                            BlocProvider.value(value: context.read<WalletBloc>()),
+                            BlocProvider.value(
+                                value: context.read<PaymentBloc>()),
+                          ],
+                          child: CheckoutSubscriptionScreen(
+                            service: widget.svc,
+                            initialPlan: selectedPlan,
+                          ),
+                        ),
+                      ));
                     }
                   },
             style: ElevatedButton.styleFrom(

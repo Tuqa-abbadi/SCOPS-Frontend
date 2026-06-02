@@ -7,17 +7,25 @@ class PaymentApiService {
 
   final Dio _dio;
 
-  Future<Response<dynamic>> createPaymentIntent(int serviceId) =>
-      _dio.post(ApiConstants.createPaymentIntent(serviceId));
+  Future<Response<dynamic>> createPaymentIntent(
+    int serviceId, {
+    int? planId,
+    String? serviceAccountEmail,
+  }) {
+    final body = <String, dynamic>{};
+    if (planId != null) body['plan_id'] = planId;
+    if (serviceAccountEmail != null && serviceAccountEmail.isNotEmpty) {
+      body['email'] = serviceAccountEmail;
+    }
+    return _dio.post(
+      ApiConstants.createPaymentIntent(serviceId),
+      data: body.isEmpty ? null : body,
+    );
+  }
 
   Future<Response<dynamic>> confirmPayment(
     int paymentId, {
     String? clientSecret,
   }) =>
-      _dio.post(
-        ApiConstants.confirmPayment(paymentId),
-        data: (clientSecret != null && clientSecret.isNotEmpty)
-            ? {'client_secret': clientSecret}
-            : null,
-      );
+      _dio.post(ApiConstants.confirmPayment(paymentId));
 }

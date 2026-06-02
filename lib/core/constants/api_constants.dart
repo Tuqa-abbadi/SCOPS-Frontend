@@ -5,7 +5,10 @@ class ApiConstants {
 
   static const String login = 'logIn';
   static const String register = 'register';
+  static const String verifyEmail = 'verify-email';
   static const String forgotPassword = 'forgot-password';
+  static const String verifyResetCode = 'verify-reset-code';
+  static const String resetPassword = 'reset-password';
   static const String logout = 'logout';
   static const String refreshToken = 'auth/refresh';
 

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../blocs/payment/payment_bloc.dart';
 import '../../blocs/services/services_bloc.dart';
 import '../../blocs/subscription/subscription_bloc.dart';
 import '../../blocs/wallet/wallet_bloc.dart';
 import '../../core/app_design.dart';
-import '../feedback/feedback_screen.dart';
+import 'checkout_subscription_screen.dart';
 
 class AddSubscriptionScreen extends StatefulWidget {
   const AddSubscriptionScreen({super.key, this.preSelectedService});
@@ -20,7 +21,6 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
   ServicePlan? _richPlan; // full plan object from detail sheet
   String _cycle = 'Monthly';
   String? _cardId;
-  int? _cardApiId;
   int _remindDays = 3;
   String _priority = 'medium';
   bool _isSubmitting = false;
@@ -45,15 +45,6 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
     return _svc!.startingPrice * multiplier;
   }
 
-  DateTime get _renewalDate {
-    final now = DateTime.now();
-    switch (_cycle.toLowerCase()) {
-      case 'weekly': return now.add(const Duration(days: 7));
-      case 'yearly': return now.add(const Duration(days: 365));
-      default:        return now.add(const Duration(days: 30));
-    }
-  }
-
   @override
   void initState() {
     super.initState();
@@ -70,6 +61,11 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
           _plan = selected.planName;
           _cycle = _capitalizeCycle(selected.billingCycle);
         }
+      }
+      // Load plans if not already loaded for this service
+      if (svcState is! ServicesDataLoaded ||
+          svcState.detailServiceId != _svc!.id) {
+        context.read<ServicesBloc>().add(ServiceDetailRequested(_svc!.id));
       }
     }
 
@@ -102,158 +98,29 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
       !_isSubmitting;
 
   void _submit() {
-    final svcId = int.tryParse(_svc!.id);
-    final planId = _richPlan?.id ??
-        (context.read<ServicesBloc>().state is ServicesDataLoaded
-            ? (context.read<ServicesBloc>().state as ServicesDataLoaded).selectedPlanId
-            : null);
+    if (_svc == null) return;
 
-    final blocState = context.read<SubscriptionBloc>().state;
-    final currentCount = blocState is SubscriptionData
-        ? blocState.subscriptions.length
-        : 0;
-
-    setState(() => _isSubmitting = true);
-
-    context.read<SubscriptionBloc>().add(SubscriptionAdded(
-          serviceName: _svc!.name,
-          serviceIcon: _svc!.icon,
-          plan: _plan ?? 'Default',
-          billingCycle: _cycle,
-          amount: _computedAmount,
-          nextRenewal: _renewalDate,
-          cardId: _cardId!,
-          reminderDays: _remindDays,
-          serviceId: svcId,
-          planId: planId,
-          cardApiId: _cardApiId,
-          priority: _priority,
-        ));
-
-    final svcName = _svc!.name;
-    Navigator.pop(context);
-
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('$svcName added!'),
-      backgroundColor: D.cyan,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: D.r12),
-    ));
-
-    if (currentCount + 1 == 3) {
-      Future.delayed(const Duration(milliseconds: 600), () {
-        if (mounted) _showRatingPrompt(context);
-      });
-    }
-  }
-
-  void _showRatingPrompt(BuildContext ctx) {
-    int rating = 0;
-    showDialog(
-      context: ctx,
-      barrierColor: Colors.black.withValues(alpha: 0.75),
-      builder: (dlgCtx) => StatefulBuilder(
-        builder: (dlgCtx, setDlgState) => Dialog(
-          backgroundColor: Colors.transparent,
-          child: Container(
-            padding: const EdgeInsets.all(28),
-            decoration: BoxDecoration(
-              color: const Color(0xFF07111C),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: const Color(0xFF18E8F2).withValues(alpha: 0.20)),
-              boxShadow: [
-                BoxShadow(color: const Color(0xFF18E8F2).withValues(alpha: 0.10), blurRadius: 40),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 64, height: 64,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF18E8F2).withValues(alpha: 0.10),
-                    border: Border.all(color: const Color(0xFF18E8F2).withValues(alpha: 0.25)),
-                  ),
-                  child: const Center(child: Text('🎉', style: TextStyle(fontSize: 30))),
-                ),
-                const SizedBox(height: 18),
-                const Text("You're on a roll!",
-                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 8),
-                Text(
-                  "You just added your 3rd subscription.\nHow's SCOPS working for you?",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.50), fontSize: 13, height: 1.5),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(5, (i) {
-                    final filled = i < rating;
-                    return GestureDetector(
-                      onTap: () => setDlgState(() => rating = i + 1),
-                      child: AnimatedScale(
-                        scale: rating == i + 1 ? 1.25 : 1.0,
-                        duration: const Duration(milliseconds: 150),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: Icon(
-                            filled ? Icons.star_rounded : Icons.star_outline_rounded,
-                            color: filled ? const Color(0xFFFFB020) : Colors.white.withValues(alpha: 0.25),
-                            size: 38,
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                ),
-                const SizedBox(height: 24),
-                Row(children: [
-                  Expanded(child: TextButton(
-                    onPressed: () => Navigator.pop(dlgCtx),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        side: BorderSide(color: Colors.white.withValues(alpha: 0.10)),
-                      ),
-                    ),
-                    child: Text('Later',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontWeight: FontWeight.w600)),
-                  )),
-                  const SizedBox(width: 12),
-                  Expanded(flex: 2, child: ElevatedButton(
-                    onPressed: rating == 0 ? null : () {
-                      Navigator.pop(dlgCtx);
-                      if (rating >= 4) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                          content: const Text('Thanks for the love! ⭐'),
-                          backgroundColor: const Color(0xFF18E8F2),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ));
-                      } else {
-                        Navigator.push(ctx, MaterialPageRoute(builder: (_) => const FeedbackScreen()));
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFF5A14),
-                      disabledBackgroundColor: const Color(0xFFFF5A14).withValues(alpha: 0.30),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    child: const Text('Submit', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
-                  )),
-                ]),
-              ],
-            ),
+    // Hand off to CheckoutSubscriptionScreen which handles the full
+    // payment flow (email, payment intent, confirm) before creating
+    // the subscription record.
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MultiBlocProvider(
+          providers: [
+            BlocProvider.value(value: context.read<PaymentBloc>()),
+            BlocProvider.value(value: context.read<ServicesBloc>()),
+            BlocProvider.value(value: context.read<WalletBloc>()),
+            BlocProvider.value(value: context.read<SubscriptionBloc>()),
+          ],
+          child: CheckoutSubscriptionScreen(
+            service: _svc!,
+            initialPlan: _richPlan,
           ),
         ),
       ),
     );
+    Navigator.pop(context);
   }
 
   Widget _svcLogo(ServiceModel svc, {double size = 28}) {
@@ -419,7 +286,10 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                           return Wrap(
                             spacing: 10, runSpacing: 10,
                             children: list.map((s) => GestureDetector(
-                              onTap: () => setState(() { _svc = s; _plan = null; _richPlan = null; }),
+                              onTap: () {
+                                setState(() { _svc = s; _plan = null; _richPlan = null; });
+                                context.read<ServicesBloc>().add(ServiceDetailRequested(s.id));
+                              },
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                                 decoration: BoxDecoration(
@@ -522,7 +392,6 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                           children: walletState.cards.map((card) => GestureDetector(
                             onTap: () => setState(() {
                               _cardId = card.id;
-                              _cardApiId = int.tryParse(card.id);
                             }),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),

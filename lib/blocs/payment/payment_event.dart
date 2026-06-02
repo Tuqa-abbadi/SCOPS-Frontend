@@ -9,12 +9,18 @@ abstract class PaymentEvent extends Equatable {
 
 /// Initiate a payment intent for the given service.
 class PaymentIntentRequested extends PaymentEvent {
-  const PaymentIntentRequested(this.serviceId);
+  const PaymentIntentRequested(
+    this.serviceId, {
+    this.planId,
+    this.serviceAccountEmail,
+  });
 
   final int serviceId;
+  final int? planId;
+  final String? serviceAccountEmail;
 
   @override
-  List<Object?> get props => [serviceId];
+  List<Object?> get props => [serviceId, planId, serviceAccountEmail];
 }
 
 /// User confirmed — call POST /payments/confirm/{paymentId}.

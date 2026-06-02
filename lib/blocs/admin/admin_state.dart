@@ -206,6 +206,7 @@ class AdminUserSubscriptionModel extends Equatable {
   const AdminUserSubscriptionModel({
     required this.id,
     required this.serviceName,
+    this.serviceLogoUrl,
     required this.plan,
     required this.amount,
     required this.billingCycle,
@@ -216,6 +217,7 @@ class AdminUserSubscriptionModel extends Equatable {
 
   final int id;
   final String serviceName;
+  final String? serviceLogoUrl;
   final String plan;
   final double amount;
   final String billingCycle;
@@ -240,13 +242,18 @@ class AdminUserSubscriptionModel extends Equatable {
 
     // Resolve service name from nested or flat
     String serviceName = '';
+    String? serviceLogoUrl;
     final svcField = json['service'];
     if (svcField is Map) {
       serviceName = svcField['name']?.toString() ?? '';
+      serviceLogoUrl = resolveLogoUrlFromJson(
+        svcField.map((k, v) => MapEntry(k.toString(), v)),
+      );
     }
     if (serviceName.isEmpty) {
       serviceName = json['service_name'] as String? ?? 'Service #${json['service_id'] ?? id}';
     }
+    serviceLogoUrl ??= resolveLogoUrlFromJson(json);
 
     // Plan name
     String plan = json['plan_name'] as String? ?? '';
@@ -272,6 +279,7 @@ class AdminUserSubscriptionModel extends Equatable {
     return AdminUserSubscriptionModel(
       id: id,
       serviceName: serviceName,
+      serviceLogoUrl: serviceLogoUrl,
       plan: plan,
       amount: _d(json['amount']),
       billingCycle: AdminServiceModel._capitalizeCycle(
@@ -286,7 +294,30 @@ class AdminUserSubscriptionModel extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, serviceName, status];
+  List<Object?> get props => [id, serviceName, serviceLogoUrl, status];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+class AdminCategoryModel extends Equatable {
+  const AdminCategoryModel({required this.id, required this.name});
+
+  final int id;
+  final String name;
+
+  factory AdminCategoryModel.fromJson(Map<String, dynamic> json) {
+    int id = 0;
+    final rawId = json['id'];
+    if (rawId is int) id = rawId;
+    if (rawId is String) id = int.tryParse(rawId) ?? 0;
+    return AdminCategoryModel(
+      id: id,
+      name: json['name'] as String? ?? '',
+    );
+  }
+
+  @override
+  List<Object?> get props => [id, name];
 }
 
 // ── States ────────────────────────────────────────────────────────────────────
@@ -310,6 +341,7 @@ class AdminData extends AdminState {
     this.statistics,
     this.users = const [],
     this.services = const [],
+    this.categories = const [],
     this.isActionLoading = false,
     this.actionError,
     this.actionSuccess,
@@ -321,6 +353,7 @@ class AdminData extends AdminState {
   final AdminStatisticsModel? statistics;
   final List<AdminUserModel> users;
   final List<AdminServiceModel> services;
+  final List<AdminCategoryModel> categories;
   final bool isActionLoading;
   final String? actionError;
   final String? actionSuccess;
@@ -332,6 +365,7 @@ class AdminData extends AdminState {
     AdminStatisticsModel? statistics,
     List<AdminUserModel>? users,
     List<AdminServiceModel>? services,
+    List<AdminCategoryModel>? categories,
     bool? isActionLoading,
     String? actionError,
     String? actionSuccess,
@@ -346,6 +380,7 @@ class AdminData extends AdminState {
         statistics: statistics ?? this.statistics,
         users: users ?? this.users,
         services: services ?? this.services,
+        categories: categories ?? this.categories,
         isActionLoading: isActionLoading ?? this.isActionLoading,
         actionError: clearError ? null : actionError ?? this.actionError,
         actionSuccess: clearSuccess ? null : actionSuccess ?? this.actionSuccess,
@@ -359,6 +394,7 @@ class AdminData extends AdminState {
         statistics,
         users,
         services,
+        categories,
         isActionLoading,
         actionError,
         actionSuccess,

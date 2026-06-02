@@ -65,6 +65,48 @@ class ForgotPasswordSubmitted extends AuthEvent {
   List<Object> get props => [email];
 }
 
+class EmailVerificationSubmitted extends AuthEvent {
+  const EmailVerificationSubmitted({
+    required this.email,
+    required this.token,
+    this.password,
+  });
+
+  final String email;
+  final String token;
+  final String? password;
+
+  @override
+  List<Object> get props => [email, token, password ?? ''];
+}
+
+class VerifyCodeSubmitted extends AuthEvent {
+  const VerifyCodeSubmitted({required this.email, required this.token});
+
+  final String email;
+  final String token;
+
+  @override
+  List<Object> get props => [email, token];
+}
+
+class ResetPasswordSubmitted extends AuthEvent {
+  const ResetPasswordSubmitted({
+    required this.email,
+    required this.token,
+    required this.password,
+    required this.passwordConfirmation,
+  });
+
+  final String email;
+  final String token;
+  final String password;
+  final String passwordConfirmation;
+
+  @override
+  List<Object> get props => [email, token, password, passwordConfirmation];
+}
+
 class TogglePasswordVisibility extends AuthEvent {
   const TogglePasswordVisibility();
 }

@@ -1,6 +1,5 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:intl/intl.dart';
@@ -49,7 +48,7 @@ class WalletScreen extends StatelessWidget {
       backgroundColor: Colors.transparent,
       builder: (_) => BlocProvider.value(
         value: context.read<WalletBloc>(),
-        child: const _AddCardSheet(),
+        child: const AddCardSheet(),
       ),
     );
   }
@@ -272,6 +271,17 @@ class WalletScreen extends StatelessWidget {
                                         letterSpacing: 2),
                                   ),
                                   const SizedBox(height: 12),
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 6),
+                                    child: Text(
+                                      '\$${(card.balance ?? 0.0).toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                          color: D.white,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 0.5),
+                                    ),
+                                  ),
                                   Row(
                                     children: [
                                       Expanded(
@@ -445,6 +455,58 @@ class WalletScreen extends StatelessWidget {
   }
 }
 
+class _CardNumberInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final limitedDigits = digits.length > 16 ? digits.substring(0, 16) : digits;
+    final buffer = StringBuffer();
+    for (var i = 0; i < limitedDigits.length; i++) {
+      if (i > 0 && i % 4 == 0) buffer.write(' ');
+      buffer.write(limitedDigits[i]);
+    }
+    final text = buffer.toString();
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+}
+
+class _ExpiryInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) {
+      return const TextEditingValue();
+    }
+
+    final normalizedDigits =
+        digits.length == 1 && int.parse(digits) > 1 ? '0$digits' : digits;
+    if (normalizedDigits.length >= 2) {
+      final month = int.tryParse(normalizedDigits.substring(0, 2));
+      if (month == null || month < 1 || month > 12) return oldValue;
+    }
+
+    final limitedDigits = normalizedDigits.length > 4
+        ? normalizedDigits.substring(0, 4)
+        : normalizedDigits;
+    final text = limitedDigits.length <= 2
+        ? limitedDigits
+        : '${limitedDigits.substring(0, 2)}/${limitedDigits.substring(2)}';
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+}
+
 // ── Card subscriptions sheet ───────────────────────────────────────────────────
 
 class _CardSubsSheet extends StatelessWidget {
@@ -562,10 +624,25 @@ class _CardSubsSheet extends StatelessWidget {
                               color: Colors.black.withValues(alpha: 0.30),
                               borderRadius: D.r12,
                             ),
-                            child: Center(
-                              child: Text(sub.serviceIcon,
-                                  style: const TextStyle(fontSize: 22)),
-                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: sub.serviceLogoUrl != null &&
+                                    sub.serviceLogoUrl!.isNotEmpty
+                                ? Image.network(
+                                    sub.serviceLogoUrl!,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (_, __, ___) => Center(
+                                      child: Text(
+                                        sub.serviceIcon,
+                                        style: const TextStyle(fontSize: 22),
+                                      ),
+                                    ),
+                                  )
+                                : Center(
+                                    child: Text(
+                                      sub.serviceIcon,
+                                      style: const TextStyle(fontSize: 22),
+                                    ),
+                                  ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -631,16 +708,39 @@ class _CardSubsSheet extends StatelessWidget {
 
 // ── Add Card bottom sheet ──────────────────────────────────────────────────────
 
-class _AddCardSheet extends StatefulWidget {
-  const _AddCardSheet();
+class AddCardSheet extends StatefulWidget {
+  const AddCardSheet({
+    super.key,
+    this.title = 'Add New Card',
+    this.subtitle = 'Enter your name and card details securely through Stripe.',
+    this.successMessage = 'Card added successfully!',
+    this.showSkip = false,
+    this.skipLabel = 'Skip for now',
+    this.onCardAdded,
+    this.onSkip,
+  });
+
+  final String title;
+  final String subtitle;
+  final String successMessage;
+  final bool showSkip;
+  final String skipLabel;
+  final VoidCallback? onCardAdded;
+  final VoidCallback? onSkip;
 
   @override
-  State<_AddCardSheet> createState() => _AddCardSheetState();
+  State<AddCardSheet> createState() => _AddCardSheetState();
 }
 
-class _AddCardSheetState extends State<_AddCardSheet> {
+class _AddCardSheetState extends State<AddCardSheet> {
   final _holderCtrl = TextEditingController();
+  final _cardNumberCtrl = TextEditingController();
+  final _expiryCtrl = TextEditingController();
+  final _cvcCtrl = TextEditingController();
   String? _holderError;
+  String? _cardNumberError;
+  String? _expiryError;
+  String? _cvcError;
   bool _cardComplete = false;
   String? _activeClientSecret;
   bool _stripeInProgress = false;
@@ -649,15 +749,68 @@ class _AddCardSheetState extends State<_AddCardSheet> {
   String? _saveStatus;
 
   @override
+  void initState() {
+    super.initState();
+    _cardNumberCtrl.addListener(_updateManualCardComplete);
+    _expiryCtrl.addListener(_updateManualCardComplete);
+    _cvcCtrl.addListener(_updateManualCardComplete);
+  }
+
+  @override
   void dispose() {
     _holderCtrl.dispose();
+    _cardNumberCtrl.dispose();
+    _expiryCtrl.dispose();
+    _cvcCtrl.dispose();
     super.dispose();
   }
 
+  String _digitsOnly(String value) => value.replaceAll(RegExp(r'\D'), '');
+
+  ({int? month, int? year}) _parseExpiry() {
+    final parts = _expiryCtrl.text.split('/');
+    if (parts.length != 2) return (month: null, year: null);
+    final month = int.tryParse(parts[0]);
+    final shortYear = int.tryParse(parts[1]);
+    return (month: month, year: shortYear == null ? null : 2000 + shortYear);
+  }
+
+  bool _isCardDetailsComplete() {
+    final number = _digitsOnly(_cardNumberCtrl.text);
+    final expiry = _parseExpiry();
+    final cvc = _digitsOnly(_cvcCtrl.text);
+    return number.length == 16 &&
+        _isValidExpiry(expiry.month, expiry.year) &&
+        cvc.length >= 3;
+  }
+
+  bool _isValidExpiry(int? month, int? year) {
+    if (month == null || month < 1 || month > 12 || year == null) {
+      return false;
+    }
+    final now = DateTime.now();
+    final lastDayOfExpiryMonth = DateTime(year, month + 1, 0, 23, 59, 59);
+    return !lastDayOfExpiryMonth.isBefore(now);
+  }
+
+  void _updateManualCardComplete() {
+    final complete = _isCardDetailsComplete();
+    if (complete != _cardComplete && mounted) {
+      setState(() => _cardComplete = complete);
+    }
+  }
+
   bool _validate() {
-    final holderError =
-        _holderCtrl.text.trim().isEmpty ? 'Card holder name is required' : null;
-    setState(() => _holderError = holderError);
+    final holderError = _holderCtrl.text.trim().isEmpty
+        ? 'Card holder name is required'
+        : null;
+
+    setState(() {
+      _holderError = holderError;
+      _cardNumberError = null;
+      _expiryError = null;
+      _cvcError = null;
+    });
     return holderError == null;
   }
 
@@ -695,6 +848,8 @@ class _AddCardSheetState extends State<_AddCardSheet> {
       }
 
       if (!context.mounted) return;
+      // ignore: avoid_print
+      print('[AddCardSheet] Stripe payment method id: $pmId');
       context.read<WalletBloc>().add(WalletStripeCardSaved(
             paymentMethodId: pmId,
             cardHolderName: _holderCtrl.text.trim(),
@@ -730,14 +885,14 @@ class _AddCardSheetState extends State<_AddCardSheet> {
     }
   }
 
-  Future<void> _createAndSavePaymentMethod(BuildContext context) async {
+  void _requestStripeCardSetup(BuildContext context) {
     // ignore: avoid_print
-    print('[AddCardSheet] Save Card tapped');
+    print('[AddCardSheet] Continue to Stripe tapped');
 
     if (!_validate()) return;
 
     if (AppConfig.stripePublishableKey.contains('YOUR_KEY_HERE')) {
-      await showDialog<void>(
+      showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
           backgroundColor: D.cardBg,
@@ -761,102 +916,242 @@ class _AddCardSheetState extends State<_AddCardSheet> {
       return;
     }
 
-    setState(() {
-      _isCreatingPaymentMethod = true;
-      _saveStatus = 'Creating card token...';
-    });
-    try {
-      final holderName = _holderCtrl.text.trim();
-      // ignore: avoid_print
-      print('[AddCardSheet] Creating Stripe payment method');
-      final paymentMethod = await Stripe.instance.createPaymentMethod(
-        params: PaymentMethodParams.card(
-          paymentMethodData: PaymentMethodData(
-            billingDetails: BillingDetails(name: holderName),
-          ),
-        ),
-      ).timeout(const Duration(seconds: 15));
-
-      if (paymentMethod.id.isEmpty) {
-        throw Exception('Stripe did not return a payment method ID.');
-      }
-
-      if (!context.mounted) return;
-      setState(() => _saveStatus = 'Saving to server...');
-      // ignore: avoid_print
-      print('[AddCardSheet] Saving payment method ${paymentMethod.id}');
-      context.read<WalletBloc>().add(WalletStripeCardSaved(
-            paymentMethodId: paymentMethod.id,
-            cardHolderName: holderName,
-          ));
-    } on StripeException catch (e) {
-      if (mounted) setState(() => _saveStatus = null);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(e.error.localizedMessage ?? 'Card setup failed.'),
-        backgroundColor: D.orange,
-        behavior: SnackBarBehavior.floating,
-      ));
-    } on TimeoutException {
-      if (mounted) setState(() => _saveStatus = null);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Stripe took too long. Please try again.'),
-        backgroundColor: D.orange,
-        behavior: SnackBarBehavior.floating,
-      ));
-    } catch (e) {
-      if (mounted) setState(() => _saveStatus = null);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(e.toString()),
-        backgroundColor: D.orange,
-        behavior: SnackBarBehavior.floating,
-      ));
-    } finally {
-      if (mounted) setState(() => _isCreatingPaymentMethod = false);
-    }
+    setState(() => _saveStatus = 'Opening Stripe...');
+    context.read<WalletBloc>().add(const WalletSetupIntentRequested());
   }
 
-  InputDecoration _fieldDec(String hint, {Widget? prefix}) => InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: D.textSub, fontSize: 13),
-        filled: true,
-        fillColor: D.fieldBg,
-        border:
-            OutlineInputBorder(borderRadius: D.r16, borderSide: BorderSide.none),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: D.r16,
-          borderSide:
-              BorderSide(color: Colors.white.withValues(alpha: 0.07), width: 1),
-        ),
-        focusedBorder: const OutlineInputBorder(
-          borderRadius: D.r16,
-          borderSide: BorderSide(color: D.cyan, width: 1.5),
-        ),
-        errorBorder: const OutlineInputBorder(
-          borderRadius: D.r16,
-          borderSide: BorderSide(color: D.orange, width: 1.2),
-        ),
-        focusedErrorBorder: const OutlineInputBorder(
-          borderRadius: D.r16,
-          borderSide: BorderSide(color: D.orange, width: 1.5),
-        ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        prefixIcon: prefix,
-        errorStyle: const TextStyle(color: D.orange, fontSize: 11),
+  BoxDecoration _cardBoxDecoration({
+    Color borderColor = const Color(0x2633F4FF),
+    bool glow = false,
+  }) =>
+      BoxDecoration(
+        color: D.cardBg.withValues(alpha: 0.96),
+        borderRadius: D.r20,
+        border: Border.all(color: borderColor, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.38),
+            blurRadius: 16,
+            offset: const Offset(0, 10),
+          ),
+          if (glow)
+            BoxShadow(
+              color: D.cyan.withValues(alpha: 0.12),
+              blurRadius: 22,
+            ),
+        ],
       );
+
+  Widget _inputShell({
+    required IconData icon,
+    required String label,
+    required Widget child,
+    bool dense = false,
+    String? errorText,
+  }) {
+    return Container(
+      height: errorText == null ? (dense ? 70 : 76) : (dense ? 86 : 92),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: _cardBoxDecoration(),
+      child: Row(
+        children: [
+          Icon(icon, color: D.cyan, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: D.textSub.withValues(alpha: 0.95),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                child,
+                if (errorText != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    errorText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: D.orange, fontSize: 10),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _flatFieldDecoration(String hint) => InputDecoration(
+        isDense: true,
+        hintText: hint,
+        hintStyle: TextStyle(
+          color: D.textSub.withValues(alpha: 0.80),
+          fontSize: 16,
+        ),
+        filled: false,
+        fillColor: Colors.transparent,
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+        disabledBorder: InputBorder.none,
+        errorBorder: InputBorder.none,
+        focusedErrorBorder: InputBorder.none,
+        contentPadding: EdgeInsets.zero,
+      );
+
+  Widget _manualCardField({
+    required TextEditingController controller,
+    required IconData icon,
+    required String label,
+    required String hint,
+    required bool isBusy,
+    required List<TextInputFormatter> inputFormatters,
+    TextInputType keyboardType = TextInputType.number,
+    String? errorText,
+    bool dense = false,
+  }) {
+    return _inputShell(
+      icon: icon,
+      label: label,
+      dense: dense,
+      errorText: errorText,
+      child: TextField(
+        controller: controller,
+        enabled: !isBusy,
+        keyboardType: keyboardType,
+        inputFormatters: inputFormatters,
+        style: const TextStyle(
+          color: D.white,
+          fontWeight: FontWeight.w700,
+          fontSize: 16,
+          letterSpacing: 0,
+        ),
+        cursorColor: D.cyan,
+        decoration: _flatFieldDecoration(hint),
+      ),
+    );
+  }
+
+  Widget _securityNotice() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: _cardBoxDecoration(
+        borderColor: D.cyan.withValues(alpha: 0.70),
+        glow: true,
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.shield_outlined, color: D.cyan, size: 28),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              'Card details are securely handled by Stripe. We never store your card details.',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.78),
+                fontSize: 13,
+                height: 1.45,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _saveButton({
+    required bool isBusy,
+    required String? statusText,
+    required VoidCallback? onPressed,
+  }) {
+    return Container(
+      width: double.infinity,
+      height: 60,
+      decoration: BoxDecoration(
+        borderRadius: D.r20,
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFF8A00), D.orange, Color(0xFFFF2F17)],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: D.orange.withValues(alpha: 0.34),
+            blurRadius: 30,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          foregroundColor: D.white,
+          disabledBackgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(borderRadius: D.r20),
+          elevation: 0,
+        ),
+        child: isBusy
+            ? Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2.3,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      statusText ?? 'Saving...',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Save Card',
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                  ),
+                  SizedBox(width: 12),
+                  Icon(Icons.arrow_forward_rounded, size: 25),
+                ],
+              ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<WalletBloc, WalletState>(
       listenWhen: (_, s) =>
           s is WalletAddingCard ||
+          s is WalletSetupIntentReady ||
           (s is WalletData && s.cardJustAdded) ||
           s is WalletError,
       listener: (context, state) {
-        if (state is WalletData && state.cardJustAdded) {
+        if (state is WalletSetupIntentReady) {
+          _runStripeFlow(context, state);
+        } else if (state is WalletData && state.cardJustAdded) {
           if (mounted) {
             setState(() {
               _saveStatus = null;
@@ -864,8 +1159,9 @@ class _AddCardSheetState extends State<_AddCardSheet> {
           }
           final messenger = ScaffoldMessenger.of(context);
           Navigator.of(context).pop();
-          messenger.showSnackBar(const SnackBar(
-            content: Text('Card added successfully!'),
+          widget.onCardAdded?.call();
+          messenger.showSnackBar(SnackBar(
+            content: Text(widget.successMessage),
             backgroundColor: D.cyan,
             behavior: SnackBarBehavior.floating,
           ));
@@ -891,12 +1187,31 @@ class _AddCardSheetState extends State<_AddCardSheet> {
           padding:
               EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
           child: Container(
-            decoration: const BoxDecoration(
-              color: D.cardBg,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.90,
             ),
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-            child: Column(
+            decoration: BoxDecoration(
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(32)),
+              border: Border(
+                top: BorderSide(color: D.cyan.withValues(alpha: 0.22)),
+              ),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [D.bg, Color(0xFF080B10), Color(0xFF030507)],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: D.cyan.withValues(alpha: 0.12),
+                  blurRadius: 42,
+                  offset: const Offset(0, -12),
+                ),
+              ],
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
+              child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -911,46 +1226,49 @@ class _AddCardSheetState extends State<_AddCardSheet> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text('Add New Card',
-                    style: TextStyle(
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(widget.title,
+                          style: const TextStyle(
                         color: D.white,
                         fontSize: 20,
                         fontWeight: FontWeight.w900)),
+                    ),
+                    if (widget.showSkip)
+                      TextButton(
+                        onPressed: isBusy
+                            ? null
+                            : () {
+                                Navigator.of(context).pop();
+                                widget.onSkip?.call();
+                              },
+                        style: TextButton.styleFrom(
+                          foregroundColor: D.textSub,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          minimumSize: const Size(0, 34),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          widget.skipLabel,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
                 const SizedBox(height: 4),
-                const Text(
-                  'Enter your name and card details securely through Stripe.',
-                  style: TextStyle(color: D.textSub, fontSize: 12),
+                Text(
+                  widget.subtitle,
+                  style: const TextStyle(color: D.textSub, fontSize: 12),
                 ),
                 const SizedBox(height: 24),
 
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 10),
-                  child: Text('Card Details',
-                      style: TextStyle(
-                          color: D.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13)),
-                ),
-                Container(
-                  decoration: BoxDecoration(
-                    color: D.fieldBg,
-                    borderRadius: D.r16,
-                    border:
-                        Border.all(color: Colors.white.withValues(alpha: 0.07)),
-                  ),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  child: CardField(
-                    disabled: isBusy,
-                    enablePostalCode: false,
-                    cursorColor: D.cyan,
-                    style: const TextStyle(color: D.white, fontSize: 14),
-                    decoration: const InputDecoration(border: InputBorder.none),
-                    onCardChanged: (details) {
-                      setState(() => _cardComplete = details?.complete ?? false);
-                    },
-                  ),
-                ),
+                _securityNotice(),
                 const SizedBox(height: 18),
 
                 // Card holder name — the only field Flutter collects
@@ -962,17 +1280,22 @@ class _AddCardSheetState extends State<_AddCardSheet> {
                           fontWeight: FontWeight.w700,
                           fontSize: 13)),
                 ),
-                TextField(
-                  controller: _holderCtrl,
-                  textCapitalization: TextCapitalization.words,
-                  enabled: !isBusy,
-                  style: const TextStyle(
-                      color: D.white, fontWeight: FontWeight.w600),
-                  decoration: _fieldDec(
-                    'e.g. John Doe',
-                    prefix: const Icon(Icons.person_outline_rounded,
-                        color: D.textSub, size: 20),
-                  ).copyWith(errorText: _holderError),
+                _inputShell(
+                  icon: Icons.person_outline_rounded,
+                  label: 'Name on Card',
+                  errorText: _holderError,
+                  child: TextField(
+                    controller: _holderCtrl,
+                    textCapitalization: TextCapitalization.words,
+                    enabled: !isBusy,
+                    style: const TextStyle(
+                      color: D.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                    cursorColor: D.cyan,
+                    decoration: _flatFieldDecoration('e.g. John Doe'),
+                  ),
                 ),
                 const SizedBox(height: 12),
 
@@ -1008,9 +1331,8 @@ class _AddCardSheetState extends State<_AddCardSheet> {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: isBusy
-                        ? null
-                        : () => _createAndSavePaymentMethod(context),
+                    onPressed:
+                        isBusy ? null : () => _requestStripeCardSetup(context),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: D.orange,
                       foregroundColor: D.white,
@@ -1040,13 +1362,14 @@ class _AddCardSheetState extends State<_AddCardSheet> {
                               ),
                             ],
                           )
-                        : const Text('Save Card',
+                        : const Text('Continue to Stripe',
                             style: TextStyle(
                                 fontWeight: FontWeight.w900, fontSize: 15)),
                   ),
                 ),
               ],
             ),
+          ),
           ),
         );
       },

@@ -42,3 +42,9 @@ class WalletPrimaryChanged extends WalletEvent {
   @override
   List<Object> get props => [cardId];
 }
+
+/// Resets the bloc to its initial state (dispatched on logout so the next
+/// login always fetches fresh data for the new user).
+class WalletReset extends WalletEvent {
+  const WalletReset();
+}

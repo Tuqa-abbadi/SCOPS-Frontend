@@ -21,9 +21,16 @@ class WalletBloc extends Bloc<WalletEvent, WalletState> {
     on<WalletStripeCardSaved>(_onStripeCardSaved);
     on<WalletCardDeleted>(_onCardDeleted);
     on<WalletPrimaryChanged>(_onPrimaryChanged);
+    on<WalletReset>(_onReset);
   }
 
   final CardsRepository _repository;
+
+  // ── Reset (on logout) ─────────────────────────────────────────────────────
+
+  void _onReset(WalletReset _, Emitter<WalletState> emit) {
+    emit(const WalletInitial());
+  }
 
   // ── Load cards ────────────────────────────────────────────────────────────
 

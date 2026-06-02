@@ -11,6 +11,7 @@ class SubscriptionModel extends Equatable {
     this.cardApiId,
     required this.serviceName,
     required this.serviceIcon,
+    this.serviceLogoUrl,
     required this.plan,
     required this.billingCycle,
     required this.amount,
@@ -20,6 +21,7 @@ class SubscriptionModel extends Equatable {
     this.status = SubscriptionStatus.active,
     this.priority = 'medium',
     this.startDate,
+    this.serviceAccountEmail,
   });
 
   final String id;          // String of apiId, used by existing UI
@@ -29,6 +31,7 @@ class SubscriptionModel extends Equatable {
   final int? cardApiId;
   final String serviceName;
   final String serviceIcon;
+  final String? serviceLogoUrl;
   final String plan;        // plan display name
   final String billingCycle; // Monthly | Weekly | Yearly
   final double amount;
@@ -38,6 +41,7 @@ class SubscriptionModel extends Equatable {
   final SubscriptionStatus status;
   final String priority;
   final DateTime? startDate; // null only for locally-created subscriptions
+  final String? serviceAccountEmail;
 
   bool get isActive    => status == SubscriptionStatus.active;
   bool get isPaused    => status == SubscriptionStatus.paused;
@@ -54,6 +58,8 @@ class SubscriptionModel extends Equatable {
     SubscriptionStatus? status,
     String? priority,
     DateTime? startDate,
+    String? serviceAccountEmail,
+    String? serviceLogoUrl,
   }) =>
       SubscriptionModel(
         id: id,
@@ -63,6 +69,7 @@ class SubscriptionModel extends Equatable {
         cardApiId: cardApiId ?? this.cardApiId,
         serviceName: serviceName,
         serviceIcon: serviceIcon,
+        serviceLogoUrl: serviceLogoUrl ?? this.serviceLogoUrl,
         plan: plan ?? this.plan,
         billingCycle: billingCycle ?? this.billingCycle,
         amount: amount ?? this.amount,
@@ -72,11 +79,12 @@ class SubscriptionModel extends Equatable {
         status: status ?? this.status,
         priority: priority ?? this.priority,
         startDate: startDate ?? this.startDate,
+        serviceAccountEmail: serviceAccountEmail ?? this.serviceAccountEmail,
       );
 
   @override
   List<Object?> get props =>
-      [id, plan, billingCycle, amount, status, priority, startDate];
+      [id, plan, billingCycle, amount, status, priority, startDate, serviceAccountEmail, serviceLogoUrl];
 }
 
 // ── States ────────────────────────────────────────────────────────────────────

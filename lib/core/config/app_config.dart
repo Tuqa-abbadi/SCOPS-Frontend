@@ -1,8 +1,7 @@
 class AppConfig {
   AppConfig._();
 
-  static const String apiBaseUrl =
-      'https://overgenerous-supercerebrally-russel.ngrok-free.dev/api/';
+  static const String apiBaseUrl = 'https://overgenerous-supercerebrally-russel.ngrok-free.dev/api/';
 
   // Replace with your Stripe publishable key (pk_test_... or pk_live_...)
   static const String stripePublishableKey =

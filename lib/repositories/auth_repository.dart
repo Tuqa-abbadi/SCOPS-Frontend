@@ -86,6 +86,100 @@ class AuthRepository {
     }
   }
 
+  Future<AuthResult> verifyEmail({
+    required String email,
+    required String token,
+  }) async {
+    try {
+      final response = await _authApiService.verifyEmail(
+        email: email,
+        token: token,
+      );
+
+      return _handleAuthResponse(
+        response.data,
+        defaultMessage: 'Email verified successfully.',
+      );
+    } on DioException catch (error) {
+      return AuthResult(success: false, message: _parseDioError(error));
+    } catch (_) {
+      return const AuthResult(
+        success: false,
+        message: 'Something went wrong. Please try again.',
+      );
+    }
+  }
+
+  Future<AuthResult> verifyResetCode({
+    required String email,
+    required String token,
+  }) async {
+    try {
+      final response = await _authApiService.verifyResetCode(
+        email: email,
+        token: token,
+      );
+      final data = _asMap(response.data);
+
+      if (data['success'] == false) {
+        return AuthResult(
+          success: false,
+          message: _messageFrom(data) ?? 'Invalid or expired code.',
+        );
+      }
+
+      return AuthResult(
+        success: true,
+        message: _messageFrom(data) ?? 'Code verified.',
+      );
+    } on DioException catch (error) {
+      return AuthResult(success: false, message: _parseDioError(error));
+    } catch (_) {
+      return const AuthResult(
+        success: false,
+        message: 'Something went wrong. Please try again.',
+      );
+    }
+  }
+
+  Future<AuthResult> resetPassword({
+    required String email,
+    required String token,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    try {
+      final response = await _authApiService.resetPassword(
+        email: email,
+        token: token,
+        password: password,
+        passwordConfirmation: passwordConfirmation,
+      );
+      final data = _asMap(response.data);
+
+      if (data['success'] == false) {
+        return AuthResult(
+          success: false,
+          message: _messageFrom(data) ??
+              _validationMessageFrom(data) ??
+              'Password reset failed. Please try again.',
+        );
+      }
+
+      return AuthResult(
+        success: true,
+        message: _messageFrom(data) ?? 'Password reset successfully.',
+      );
+    } on DioException catch (error) {
+      return AuthResult(success: false, message: _parseDioError(error));
+    } catch (_) {
+      return const AuthResult(
+        success: false,
+        message: 'Something went wrong. Please try again.',
+      );
+    }
+  }
+
   Future<AuthResult> forgotPassword({required String email}) async {
     try {
       final response = await _authApiService.forgotPassword(email: email);
