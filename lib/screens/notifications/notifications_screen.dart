@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
 import 'package:intl/intl.dart';
 import '../../../blocs/notification/notification_model.dart';
 
@@ -16,12 +17,14 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   late List<NotificationModel> _notifications;
 
-  static const _bg = Color(0xFF020812);
-  static const _card = Color(0xFF07111C);
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _bg => _isDark ? Color(0xFF020812) : AppColors.lightBackground;
+  Color get _card => _isDark ? Color(0xFF07111C) : AppColors.lightSurface;
   static const _cyan = Color(0xFF18E8F2);
   static const _orange = Color(0xFFFF5A14);
-  static const _white = Colors.white;
-  static const _muted = Color(0xFF9BA4B0);
+  Color get _white => _isDark ? Colors.white : AppColors.lightTextPrimary;
+  Color get _muted =>
+      _isDark ? Color(0xFF9BA4B0) : AppColors.lightTextSecondary;
 
   @override
   void initState() {
@@ -55,7 +58,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case NotificationType.renewal:
         return _cyan;
       case NotificationType.payment:
-        return const Color(0xFF22C55E);
+        return Color(0xFF22C55E);
       case NotificationType.system:
         return _muted;
       case NotificationType.promo:
@@ -117,12 +120,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       onDismissed: (_) => _dismiss(n.id),
       background: Container(
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
+        padding: EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
           color: _orange.withOpacity(0.12),
           borderRadius: BorderRadius.circular(20),
         ),
-        child: const Icon(Icons.delete_outline_rounded, color: _orange),
+        child: Icon(Icons.delete_outline_rounded, color: _orange),
       ),
       child: GestureDetector(
         onTap: () {
@@ -131,9 +134,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           // if (n.subscriptionId != null) { ... }
         },
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.all(14),
+          duration: Duration(milliseconds: 200),
+          margin: EdgeInsets.only(bottom: 10),
+          padding: EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: isUnread ? _card.withOpacity(1) : _card.withOpacity(0.6),
             borderRadius: BorderRadius.circular(20),
@@ -161,10 +164,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   children: [
                     Center(
                       child: n.serviceIcon != null
-                          ? Text(
-                              n.serviceIcon!,
-                              style: const TextStyle(fontSize: 20),
-                            )
+                          ? Text(n.serviceIcon!, style: TextStyle(fontSize: 20))
                           : Icon(_typeIcon(n.type), color: color, size: 20),
                     ),
                     if (isUnread)
@@ -189,7 +189,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -217,7 +217,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Text(
                       n.body,
                       style: TextStyle(
@@ -227,9 +227,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       ),
                     ),
                     if (n.subscriptionId != null) ...[
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(
+                        padding: EdgeInsets.symmetric(
                           horizontal: 10,
                           vertical: 4,
                         ),
@@ -268,13 +268,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           children: [
             // Header
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Row(
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Notifications',
                         style: TextStyle(
                           color: _white,
@@ -285,15 +285,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       if (_unreadCount > 0)
                         Text(
                           '$_unreadCount unread',
-                          style: const TextStyle(color: _cyan, fontSize: 13),
+                          style: TextStyle(color: _cyan, fontSize: 13),
                         ),
                     ],
                   ),
-                  const Spacer(),
+                  Spacer(),
                   if (_unreadCount > 0)
                     TextButton(
                       onPressed: _markAllRead,
-                      child: const Text(
+                      child: Text(
                         'Mark all read',
                         style: TextStyle(
                           color: _cyan,
@@ -305,21 +305,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
 
             // List
             Expanded(
               child: _notifications.isEmpty
                   ? _emptyState()
                   : ListView(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      padding: EdgeInsets.symmetric(horizontal: 20),
                       children: [
                         for (final entry in groups.entries) ...[
                           _groupHeader(entry.key),
                           ...entry.value.map(_notifTile),
-                          const SizedBox(height: 8),
+                          SizedBox(height: 8),
                         ],
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12),
                         Center(
                           child: Text(
                             'Swipe left to dismiss',
@@ -329,7 +329,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        SizedBox(height: 20),
                       ],
                     ),
             ),
@@ -340,7 +340,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Widget _groupHeader(String label) => Padding(
-    padding: const EdgeInsets.only(bottom: 10, top: 4),
+    padding: EdgeInsets.only(bottom: 10, top: 4),
     child: Text(
       label.toUpperCase(),
       style: TextStyle(
@@ -364,14 +364,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             shape: BoxShape.circle,
             border: Border.all(color: _cyan.withOpacity(0.20)),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.notifications_none_rounded,
             color: _muted,
             size: 34,
           ),
         ),
-        const SizedBox(height: 16),
-        const Text(
+        SizedBox(height: 16),
+        Text(
           'All caught up!',
           style: TextStyle(
             color: _white,
@@ -379,8 +379,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             fontWeight: FontWeight.w800,
           ),
         ),
-        const SizedBox(height: 6),
-        const Text(
+        SizedBox(height: 6),
+        Text(
           'No notifications yet',
           style: TextStyle(color: _muted, fontSize: 13),
         ),

@@ -9,6 +9,8 @@ import '../../blocs/subscription/subscription_bloc.dart';
 import '../../blocs/user/user_cubit.dart';
 import '../../blocs/wallet/wallet_bloc.dart';
 import '../../models/user_model.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/theme_controller.dart';
 import '../admin/admin_dashboard_screen.dart';
 import '../auth/auth_choice_screen.dart';
 import '../feedback/feedback_screen.dart';
@@ -32,12 +34,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static const _darkText = Color(0xFFF5F7FA);
   static const _darkMuted = Color(0xFF8B98A8);
 
-  static const _lightBg = Color(0xFFF6F8FB);
-  static const _lightCard = Color(0xFFFFFFFF);
-  static const _lightCard2 = Color(0xFFF2F4F7);
-  static const _lightCyan = Color(0xFF00AFC1);
-  static const _lightText = Color(0xFF101722);
-  static const _lightMuted = Color(0xFF667085);
+  static const _lightBg = AppColors.lightBackground;
+  static const _lightCard = AppColors.lightSurface;
+  static const _lightCard2 = AppColors.lightSecondarySurface;
+  static const _lightCyan = AppColors.primary;
+  static const _lightText = AppColors.lightTextPrimary;
+  static const _lightMuted = AppColors.lightTextSecondary;
   static const _gold = Color(0xFFFFB020);
 
   bool _renewalReminders = true;
@@ -68,22 +70,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final subState = context.read<SubscriptionBloc>().state;
     if (subState is SubscriptionData) {
       context.read<ReviewsBloc>().add(
-            PendingReviewsRequested(subState.subscriptions),
-          );
+        PendingReviewsRequested(subState.subscriptions),
+      );
     }
   }
 
-  TextStyle get _titleStyle => TextStyle(
-        color: _text,
-        fontSize: 15,
-        fontWeight: FontWeight.w800,
-      );
+  TextStyle get _titleStyle =>
+      TextStyle(color: _text, fontSize: 15, fontWeight: FontWeight.w800);
 
-  TextStyle get _subtitleStyle => TextStyle(
-        color: _muted,
-        fontSize: 12,
-        height: 1.35,
-      );
+  TextStyle get _subtitleStyle =>
+      TextStyle(color: _muted, fontSize: 12, height: 1.35);
 
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
@@ -121,12 +117,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           backgroundColor: _cyan,
           foregroundColor: _darkBg,
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
         ),
-        child: Text(
-          label,
-          style: const TextStyle(fontWeight: FontWeight.w900),
-        ),
+        child: Text(label, style: const TextStyle(fontWeight: FontWeight.w900)),
       ),
     );
   }
@@ -179,7 +174,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             decoration: BoxDecoration(
               color: _card,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(30),
+              ),
               border: Border.all(color: _cyan.withValues(alpha: 0.18)),
             ),
             child: SingleChildScrollView(
@@ -227,7 +224,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           color: selected ? color.withValues(alpha: 0.12) : _card2,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: selected ? color.withValues(alpha: 0.55) : _cyan.withValues(alpha: 0.12),
+            color: selected
+                ? color.withValues(alpha: 0.55)
+                : _cyan.withValues(alpha: 0.12),
           ),
         ),
         child: Row(
@@ -326,7 +325,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         return BlocBuilder<WalletBloc, WalletState>(
           builder: (context, walletState) {
-            final cardCount = walletState is WalletData ? walletState.cards.length : 0;
+            final cardCount = walletState is WalletData
+                ? walletState.cards.length
+                : 0;
             return Container(
               padding: const EdgeInsets.symmetric(vertical: 18),
               decoration: BoxDecoration(
@@ -427,7 +428,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ProfileMenuItem(
                     icon: Icons.rate_review_rounded,
                     title: 'My Reviews',
-                    subtitle: '$myReviewCount review${myReviewCount == 1 ? '' : 's'} written',
+                    subtitle:
+                        '$myReviewCount review${myReviewCount == 1 ? '' : 's'} written',
                     iconColor: _gold,
                     cardColor: _card,
                     borderColor: _cyan.withValues(alpha: 0.14),
@@ -441,7 +443,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       child: Center(
-                        child: CircularProgressIndicator(color: _cyan, strokeWidth: 2.5),
+                        child: CircularProgressIndicator(
+                          color: _cyan,
+                          strokeWidth: 2.5,
+                        ),
                       ),
                     )
                   else
@@ -519,7 +524,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 18),
           _primaryButton('Save Changes', () {
             final parts = nameController.text.trim().split(RegExp(r'\s+'));
-            final firstName = parts.isNotEmpty && parts.first.isNotEmpty ? parts.first : 'User';
+            final firstName = parts.isNotEmpty && parts.first.isNotEmpty
+                ? parts.first
+                : 'User';
             final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
             final updated = UserModel(
               id: user?.id ?? '',
@@ -590,13 +597,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 TextButton(
                   onPressed: () {
                     if (newController.text != confirmController.text) {
-                      setDialogState(() => errorText = 'New password and confirmation do not match.');
+                      setDialogState(
+                        () => errorText =
+                            'New password and confirmation do not match.',
+                      );
                       return;
                     }
                     Navigator.pop(dialogContext);
                     _showSnack('Password validation passed');
                   },
-                  child: Text('Save', style: TextStyle(color: _cyan, fontWeight: FontWeight.w900)),
+                  child: Text(
+                    'Save',
+                    style: TextStyle(color: _cyan, fontWeight: FontWeight.w900),
+                  ),
                 ),
               ],
             );
@@ -617,19 +630,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 title: 'Renewal reminders',
                 subtitle: 'Get alerts before subscriptions renew',
                 value: _renewalReminders,
-                onChanged: (value) => setSheetState(() => _renewalReminders = value),
+                onChanged: (value) =>
+                    setSheetState(() => _renewalReminders = value),
               ),
               _switchTile(
                 title: 'Monthly summary',
                 subtitle: 'Receive spending reports every month',
                 value: _monthlySummary,
-                onChanged: (value) => setSheetState(() => _monthlySummary = value),
+                onChanged: (value) =>
+                    setSheetState(() => _monthlySummary = value),
               ),
               _switchTile(
                 title: 'Offers and tips',
                 subtitle: 'Product updates and saving ideas',
                 value: _offersAndTips,
-                onChanged: (value) => setSheetState(() => _offersAndTips = value),
+                onChanged: (value) =>
+                    setSheetState(() => _offersAndTips = value),
               ),
             ],
           );
@@ -680,7 +696,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   return IconButton(
                     onPressed: () => setDialogState(() => _rating = star),
                     icon: Icon(
-                      star <= _rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                      star <= _rating
+                          ? Icons.star_rounded
+                          : Icons.star_outline_rounded,
                       color: _gold,
                       size: 34,
                     ),
@@ -699,7 +717,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Navigator.pop(dialogContext);
                           _showSnack('Thanks for rating SCOPS $_rating stars');
                         },
-                  child: Text('Submit', style: TextStyle(color: _cyan, fontWeight: FontWeight.w900)),
+                  child: Text(
+                    'Submit',
+                    style: TextStyle(color: _cyan, fontWeight: FontWeight.w900),
+                  ),
                 ),
               ],
             );
@@ -771,7 +792,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 title: 'Data permissions',
                 subtitle: 'Allow SCOPS to personalize insights',
                 value: _dataPermissions,
-                onChanged: (value) => setSheetState(() => _dataPermissions = value),
+                onChanged: (value) =>
+                    setSheetState(() => _dataPermissions = value),
               ),
               _switchTile(
                 title: 'App lock',
@@ -845,8 +867,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: _card,
-        title: Text('Log Out', style: TextStyle(color: _text, fontWeight: FontWeight.w900)),
-        content: Text('Are you sure you want to log out?', style: TextStyle(color: _muted)),
+        title: Text(
+          'Log Out',
+          style: TextStyle(color: _text, fontWeight: FontWeight.w900),
+        ),
+        content: Text(
+          'Are you sure you want to log out?',
+          style: TextStyle(color: _muted),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -857,7 +885,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Navigator.pop(dialogContext);
               context.read<LogoutBloc>().add(const LogoutRequested());
             },
-            child: Text('Log Out', style: TextStyle(color: _orange, fontWeight: FontWeight.w900)),
+            child: Text(
+              'Log Out',
+              style: TextStyle(color: _orange, fontWeight: FontWeight.w900),
+            ),
           ),
         ],
       ),
@@ -882,6 +913,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required String subtitle,
     VoidCallback? onTap,
     Color? iconColor,
+    Widget? trailing,
   }) {
     final color = iconColor ?? _cyan;
     return ProfileMenuItem(
@@ -894,11 +926,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       textColor: _text,
       mutedColor: _muted,
       onTap: onTap,
+      trailing: trailing,
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final themeController = ThemeControllerScope.of(context);
+
     return BlocListener<LogoutBloc, AuthState>(
       listener: (context, state) {
         if (state is LogoutSuccess) {
@@ -912,10 +947,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       },
       child: BlocListener<SubscriptionBloc, SubscriptionState>(
-        listenWhen: (prev, curr) => curr is SubscriptionData && prev is! SubscriptionData,
+        listenWhen: (prev, curr) =>
+            curr is SubscriptionData && prev is! SubscriptionData,
         listener: (context, state) {
           if (state is SubscriptionData) {
-            context.read<ReviewsBloc>().add(PendingReviewsRequested(state.subscriptions));
+            context.read<ReviewsBloc>().add(
+              PendingReviewsRequested(state.subscriptions),
+            );
           }
         },
         child: Container(
@@ -946,7 +984,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: IconButton.styleFrom(
                               backgroundColor: _card,
                               foregroundColor: _muted,
-                              side: BorderSide(color: _cyan.withValues(alpha: 0.18)),
+                              side: BorderSide(
+                                color: _cyan.withValues(alpha: 0.18),
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
                               ),
@@ -1009,6 +1049,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       _section('Preferences'),
+                      _menuItem(
+                        icon: _isDark
+                            ? Icons.dark_mode_outlined
+                            : Icons.light_mode_outlined,
+                        title: 'Dark Mode',
+                        subtitle: _isDark
+                            ? 'Using the original SCOPS theme'
+                            : 'Using the SCOPS light theme',
+                        onTap: () => themeController.setDarkMode(!_isDark),
+                        trailing: Switch.adaptive(
+                          value: _isDark,
+                          activeColor: _cyan,
+                          onChanged: themeController.setDarkMode,
+                        ),
+                      ),
                       _menuItem(
                         icon: Icons.tune_rounded,
                         title: 'Preferences',
@@ -1148,7 +1203,11 @@ class ProfileMenuItem extends StatelessWidget {
                     subtitle,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: mutedColor, fontSize: 12, height: 1.3),
+                    style: TextStyle(
+                      color: mutedColor,
+                      fontSize: 12,
+                      height: 1.3,
+                    ),
                   ),
                 ],
               ),

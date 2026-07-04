@@ -271,10 +271,10 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
   // ── Service name cache ─────────────────────────────────────────────────────
 
   Future<void> _ensureServiceCache() async {
-    if (_serviceCache.isNotEmpty) return;
     try {
       final response = await _servicesService.getServices();
       final list = _extractList(response.data);
+      final refreshed = <int, _ServiceDisplay>{};
       for (final item in list) {
         if (item is! Map) continue;
         final map = item.map((k, v) => MapEntry(k.toString(), v));
@@ -283,12 +283,17 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
         final icon = map['icon'] as String? ?? _iconForName(name);
         final logoUrl = resolveLogoUrlFromJson(map);
         if (id != null && name.isNotEmpty) {
-          _serviceCache[id] = _ServiceDisplay(
+          refreshed[id] = _ServiceDisplay(
             name: name,
             icon: icon,
             logoUrl: logoUrl,
           );
         }
+      }
+      if (refreshed.isNotEmpty) {
+        _serviceCache
+          ..clear()
+          ..addAll(refreshed);
       }
       _log('Service cache: ${_serviceCache.length} entries');
     } catch (e) {

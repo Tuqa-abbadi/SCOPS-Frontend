@@ -100,7 +100,7 @@ class AdminApiService {
         ...fields,
         'logo': await MultipartFile.fromFile(
           logoFile.path,
-          filename: logoFile.path.split('/').last,
+          filename: logoFile.uri.pathSegments.last,
         ),
       });
       return _dio.post(ApiConstants.adminServices, data: formData);
@@ -127,12 +127,13 @@ class AdminApiService {
     if (logoFile != null) {
       final formData = FormData.fromMap({
         ...fields,
+        '_method': 'PUT',
         'logo': await MultipartFile.fromFile(
           logoFile.path,
-          filename: logoFile.path.split('/').last,
+          filename: logoFile.uri.pathSegments.last,
         ),
       });
-      return _dio.put(ApiConstants.adminServiceById(id), data: formData);
+      return _dio.post(ApiConstants.adminServiceById(id), data: formData);
     }
     return _dio.put(ApiConstants.adminServiceById(id), data: fields);
   }

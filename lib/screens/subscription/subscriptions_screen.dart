@@ -1,12 +1,14 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../blocs/reviews/reviews_bloc.dart';
 import '../../blocs/subscription/subscription_bloc.dart';
 import '../../blocs/wallet/wallet_bloc.dart';
+import '../../widgets/service_logo.dart';
 import 'subscription_detail_screen.dart';
 
 enum _StatusFilter { all, active, paused, cancelled }
@@ -23,13 +25,17 @@ class SubscriptionsScreen extends StatefulWidget {
 }
 
 class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
-  static const _background = Color(0xFF070B12);
-  static const _card = Color(0xFF101722);
-  static const _cardDark = Color(0xFF0B111A);
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _background =>
+      _isDark ? Color(0xFF070B12) : AppColors.lightBackground;
+  Color get _card => _isDark ? Color(0xFF101722) : AppColors.lightSurface;
+  Color get _cardDark =>
+      _isDark ? Color(0xFF0B111A) : AppColors.lightSecondarySurface;
   static const _cyan = Color(0xFF00D9E8);
   static const _orange = Color(0xFFFF7A1A);
-  static const _text = Color(0xFFF5F7FA);
-  static const _muted = Color(0xFF8B98A8);
+  Color get _text => _isDark ? Color(0xFFF5F7FA) : AppColors.lightTextPrimary;
+  Color get _muted =>
+      _isDark ? Color(0xFF8B98A8) : AppColors.lightTextSecondary;
   static const _red = Color(0xFFFF4D5E);
   static const _amber = Color(0xFFFFB020);
 
@@ -81,10 +87,12 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     if (_searchQuery.trim().isNotEmpty) {
       final q = _searchQuery.trim().toLowerCase();
       list = list
-          .where((s) =>
-              s.serviceName.toLowerCase().contains(q) ||
-              s.plan.toLowerCase().contains(q) ||
-              s.billingCycle.toLowerCase().contains(q))
+          .where(
+            (s) =>
+                s.serviceName.toLowerCase().contains(q) ||
+                s.plan.toLowerCase().contains(q) ||
+                s.billingCycle.toLowerCase().contains(q),
+          )
           .toList();
     }
 
@@ -104,13 +112,13 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
       _statusFilter != _StatusFilter.all || _searchQuery.trim().isNotEmpty;
 
   void _clearFilters() => setState(() {
-        _statusFilter = _StatusFilter.all;
-        _searchQuery = '';
-        _searchCtrl.clear();
-      });
+    _statusFilter = _StatusFilter.all;
+    _searchQuery = '';
+    _searchCtrl.clear();
+  });
 
-  void _openDetail(BuildContext ctx, SubscriptionModel sub) {
-    Navigator.push(
+  Future<void> _openDetail(BuildContext ctx, SubscriptionModel sub) async {
+    final message = await Navigator.push<String>(
       ctx,
       MaterialPageRoute(
         builder: (_) => MultiBlocProvider(
@@ -121,6 +129,16 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
           ],
           child: SubscriptionDetailScreen(subscription: sub),
         ),
+      ),
+    );
+
+    if (!mounted || message == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: _orange,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -136,7 +154,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
           20,
           20 + MediaQuery.of(ctx).viewPadding.bottom,
         ),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: _card,
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
@@ -154,8 +172,8 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-            const Text(
+            SizedBox(height: 20),
+            Text(
               'Sort subscriptions',
               style: TextStyle(
                 color: _text,
@@ -163,7 +181,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                 fontWeight: FontWeight.w900,
               ),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             _sortOptionTile(
               label: 'Renewal date',
               icon: Icons.calendar_month_rounded,
@@ -204,7 +222,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     required VoidCallback onTap,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: 8),
       child: Material(
         color: selected ? _cyan.withValues(alpha: 0.10) : _cardDark,
         borderRadius: BorderRadius.circular(16),
@@ -212,7 +230,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
           onTap: onTap,
           borderRadius: BorderRadius.circular(16),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
@@ -224,7 +242,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
             child: Row(
               children: [
                 Icon(icon, color: selected ? _cyan : _muted, size: 19),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     label,
@@ -235,8 +253,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                     ),
                   ),
                 ),
-                if (selected)
-                  const Icon(Icons.check_rounded, color: _cyan, size: 18),
+                if (selected) Icon(Icons.check_rounded, color: _cyan, size: 18),
               ],
             ),
           ),
@@ -251,7 +268,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     required bool isRefreshing,
   }) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+      padding: EdgeInsets.fromLTRB(20, 18, 20, 0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -259,7 +276,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Subscriptions',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -270,10 +287,10 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 Text(
                   '$totalCount subscription${totalCount == 1 ? '' : 's'}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: _muted,
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -282,18 +299,18 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           _iconButton(
             icon: Icons.sort_rounded,
             onTap: () => _showSortSheet(context),
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: 10),
           _iconButton(
             icon: Icons.refresh_rounded,
             isLoading: isRefreshing,
-            onTap: () => context
-                .read<SubscriptionBloc>()
-                .add(const SubscriptionsRefreshRequested()),
+            onTap: () => context.read<SubscriptionBloc>().add(
+              SubscriptionsRefreshRequested(),
+            ),
           ),
         ],
       ),
@@ -309,7 +326,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
       color: Colors.transparent,
       child: InkWell(
         onTap: isLoading ? null : onTap,
-        customBorder: const CircleBorder(),
+        customBorder: CircleBorder(),
         child: Container(
           width: 46,
           height: 46,
@@ -321,12 +338,12 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
               BoxShadow(
                 color: _cyan.withValues(alpha: 0.12),
                 blurRadius: 22,
-                offset: const Offset(0, 8),
+                offset: Offset(0, 8),
               ),
             ],
           ),
           child: isLoading
-              ? const Padding(
+              ? Padding(
                   padding: EdgeInsets.all(13),
                   child: CircularProgressIndicator(
                     color: _cyan,
@@ -341,7 +358,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
 
   Widget _buildSearchBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+      padding: EdgeInsets.fromLTRB(20, 24, 20, 0),
       child: Container(
         height: 58,
         decoration: BoxDecoration(
@@ -359,7 +376,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
         child: TextField(
           controller: _searchCtrl,
           onChanged: (value) => setState(() => _searchQuery = value),
-          style: const TextStyle(
+          style: TextStyle(
             color: _text,
             fontSize: 15,
             fontWeight: FontWeight.w700,
@@ -371,19 +388,18 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
               fontSize: 15,
               fontWeight: FontWeight.w600,
             ),
-            prefixIcon: const Icon(Icons.search_rounded, color: _cyan),
+            prefixIcon: Icon(Icons.search_rounded, color: _cyan),
             suffixIcon: _searchQuery.isEmpty
                 ? null
                 : IconButton(
-                    icon: const Icon(Icons.close_rounded, color: _muted),
+                    icon: Icon(Icons.close_rounded, color: _muted),
                     onPressed: () => setState(() {
                       _searchQuery = '';
                       _searchCtrl.clear();
                     }),
                   ),
             border: InputBorder.none,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+            contentPadding: EdgeInsets.symmetric(horizontal: 18, vertical: 18),
           ),
         ),
       ),
@@ -401,7 +417,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     return SizedBox(
       height: 70,
       child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+        padding: EdgeInsets.fromLTRB(20, 18, 20, 12),
         scrollDirection: Axis.horizontal,
         itemCount: chips.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
@@ -412,8 +428,8 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
           return GestureDetector(
             onTap: () => setState(() => _statusFilter = filter),
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(horizontal: 18),
+              duration: Duration(milliseconds: 180),
+              padding: EdgeInsets.symmetric(horizontal: 18),
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: selected ? null : _cardDark,
@@ -468,7 +484,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     final planLine = _planLine(sub);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: 16),
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(26),
@@ -476,11 +492,11 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
           onTap: () => _openDetail(context, sub),
           borderRadius: BorderRadius.circular(26),
           child: Container(
-            padding: const EdgeInsets.all(18),
+            padding: EdgeInsets.all(18),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(26),
               border: Border.all(color: _cyan.withValues(alpha: 0.24)),
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [_card, _cardDark],
@@ -490,12 +506,12 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                   color: _cyan.withValues(alpha: 0.10),
                   blurRadius: 30,
                   spreadRadius: -10,
-                  offset: const Offset(0, 14),
+                  offset: Offset(0, 14),
                 ),
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.32),
                   blurRadius: 26,
-                  offset: const Offset(0, 14),
+                  offset: Offset(0, 14),
                 ),
               ],
             ),
@@ -506,7 +522,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _serviceIcon(sub),
-                    const SizedBox(width: 14),
+                    SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -524,12 +540,12 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                                   : null,
                             ),
                           ),
-                          const SizedBox(height: 5),
+                          SizedBox(height: 5),
                           Text(
                             planLine,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: _muted,
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
@@ -538,11 +554,11 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    SizedBox(width: 10),
                     _statusBadge(sub, statusColor),
                   ],
                 ),
-                const SizedBox(height: 20),
+                SizedBox(height: 20),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -551,7 +567,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                         '\$${sub.amount.toStringAsFixed(2)}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: _text,
                           fontSize: 27,
                           height: 1,
@@ -559,7 +575,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    SizedBox(width: 14),
                     Flexible(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
@@ -572,13 +588,13 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                                 color: _cyan.withValues(alpha: 0.85),
                                 size: 15,
                               ),
-                              const SizedBox(width: 6),
+                              SizedBox(width: 6),
                               Flexible(
                                 child: Text(
                                   DateFormat('MMM d').format(sub.nextRenewal),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: _text,
                                     fontSize: 13,
                                     fontWeight: FontWeight.w800,
@@ -587,12 +603,12 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 4),
+                          SizedBox(height: 4),
                           Text(
                             sub.isActive
                                 ? (rawDaysLeft < 0
-                                    ? 'due now'
-                                    : 'in $daysLeft days')
+                                      ? 'due now'
+                                      : 'in $daysLeft days')
                                 : _statusLabel(sub),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -605,15 +621,11 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      color: _cyan,
-                      size: 26,
-                    ),
+                    SizedBox(width: 8),
+                    Icon(Icons.chevron_right_rounded, color: _cyan, size: 26),
                   ],
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(99),
                   child: LinearProgressIndicator(
@@ -625,7 +637,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 9),
+                SizedBox(height: 9),
                 Text(
                   sub.isActive
                       ? '$daysLeft days left'
@@ -647,7 +659,6 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   Widget _buildBottomNav() => const SizedBox.shrink();
 
   Widget _serviceIcon(SubscriptionModel sub) {
-    final logo = sub.serviceLogoUrl;
     return Container(
       width: 56,
       height: 56,
@@ -664,28 +675,19 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: logo != null && logo.isNotEmpty
-          ? Image.network(
-              logo,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => _serviceEmoji(sub),
-            )
-          : _serviceEmoji(sub),
-    );
-  }
-
-  Widget _serviceEmoji(SubscriptionModel sub) {
-    return Center(
-      child: Text(
-        sub.serviceIcon,
-        style: const TextStyle(fontSize: 27),
+      child: ServiceLogo(
+        serviceName: sub.serviceName,
+        logoUrl: sub.serviceLogoUrl,
+        fallbackIcon: sub.serviceIcon,
+        fallbackFontSize: 27,
+        padding: const EdgeInsets.all(6),
       ),
     );
   }
 
   Widget _statusBadge(SubscriptionModel sub, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
@@ -716,8 +718,9 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
 
   String _planLine(SubscriptionModel sub) {
     final plan = sub.plan.trim().isEmpty ? 'Plan' : sub.plan.trim();
-    final cycle =
-        sub.billingCycle.trim().isEmpty ? 'Monthly' : sub.billingCycle.trim();
+    final cycle = sub.billingCycle.trim().isEmpty
+        ? 'Monthly'
+        : sub.billingCycle.trim();
     if (plan.toLowerCase() == cycle.toLowerCase()) return cycle;
     return '$plan • $cycle';
   }
@@ -736,7 +739,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   Widget _emptyState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+        padding: EdgeInsets.symmetric(horizontal: 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -748,29 +751,25 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(color: _cyan.withValues(alpha: 0.20)),
               ),
-              child: const Icon(
-                Icons.receipt_long_rounded,
-                color: _cyan,
-                size: 34,
-              ),
+              child: Icon(Icons.receipt_long_rounded, color: _cyan, size: 34),
             ),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             Text(
               _hasFilters ? 'No matches found' : 'No subscriptions yet',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: _text,
                 fontSize: 18,
                 fontWeight: FontWeight.w900,
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(
               _hasFilters
                   ? 'Try a different status or search term.'
                   : 'Your subscriptions will appear here once available.',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: _muted,
                 fontSize: 13,
                 height: 1.45,
@@ -778,18 +777,17 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
               ),
             ),
             if (_hasFilters) ...[
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
               GestureDetector(
                 onTap: _clearFilters,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
+                  padding: EdgeInsets.symmetric(horizontal: 22, vertical: 11),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(999),
                     border: Border.all(color: _cyan.withValues(alpha: 0.55)),
                     color: _cyan.withValues(alpha: 0.08),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Clear filters',
                     style: TextStyle(
                       color: _cyan,
@@ -811,7 +809,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
       color: _background,
       child: Center(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 34),
+          padding: EdgeInsets.symmetric(horizontal: 34),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -823,14 +821,10 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(color: _orange.withValues(alpha: 0.24)),
                 ),
-                child: const Icon(
-                  Icons.cloud_off_rounded,
-                  color: _orange,
-                  size: 32,
-                ),
+                child: Icon(Icons.cloud_off_rounded, color: _orange, size: 32),
               ),
-              const SizedBox(height: 18),
-              const Text(
+              SizedBox(height: 18),
+              Text(
                 'Could not load subscriptions',
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -839,23 +833,23 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   color: _muted,
                   fontSize: 13,
                   height: 1.45,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 22),
+              SizedBox(height: 22),
               _iconButton(
                 icon: Icons.refresh_rounded,
-                onTap: () => context
-                    .read<SubscriptionBloc>()
-                    .add(const SubscriptionsRefreshRequested()),
+                onTap: () => context.read<SubscriptionBloc>().add(
+                  SubscriptionsRefreshRequested(),
+                ),
               ),
             ],
           ),
@@ -883,7 +877,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
       },
       builder: (ctx, state) {
         if (state is SubscriptionsLoading) {
-          return const ColoredBox(
+          return ColoredBox(
             color: _background,
             child: Center(
               child: CircularProgressIndicator(color: _cyan, strokeWidth: 2.5),
@@ -895,8 +889,9 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
           return _errorView(ctx, state.message);
         }
 
-        final allSubs =
-            state is SubscriptionData ? state.subscriptions : <SubscriptionModel>[];
+        final allSubs = state is SubscriptionData
+            ? state.subscriptions
+            : <SubscriptionModel>[];
         final isRefreshing = state is SubscriptionData && state.isLoading;
         final shown = _applyFilters(allSubs);
 
@@ -916,15 +911,15 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                   color: _cyan,
                   backgroundColor: _card,
                   onRefresh: () async {
-                    ctx
-                        .read<SubscriptionBloc>()
-                        .add(const SubscriptionsRefreshRequested());
-                    await Future.delayed(const Duration(milliseconds: 700));
+                    ctx.read<SubscriptionBloc>().add(
+                      SubscriptionsRefreshRequested(),
+                    );
+                    await Future.delayed(Duration(milliseconds: 700));
                   },
                   child: shown.isEmpty && !isRefreshing
                       ? ListView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.fromLTRB(20, 30, 20, 120),
+                          physics: AlwaysScrollableScrollPhysics(),
+                          padding: EdgeInsets.fromLTRB(20, 30, 20, 120),
                           children: [
                             SizedBox(
                               height: MediaQuery.of(context).size.height * 0.42,
@@ -933,12 +928,12 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                           ],
                         )
                       : ListView.builder(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+                          physics: AlwaysScrollableScrollPhysics(),
+                          padding: EdgeInsets.fromLTRB(20, 8, 20, 120),
                           itemCount: shown.length + (isRefreshing ? 1 : 0),
                           itemBuilder: (_, index) {
                             if (isRefreshing && index == 0) {
-                              return const Padding(
+                              return Padding(
                                 padding: EdgeInsets.only(bottom: 14),
                                 child: Center(
                                   child: SizedBox(

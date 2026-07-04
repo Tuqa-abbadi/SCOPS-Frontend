@@ -6,6 +6,7 @@ import '../../blocs/services/services_bloc.dart';
 import '../../blocs/subscription/subscription_bloc.dart';
 import '../../blocs/wallet/wallet_bloc.dart';
 import '../../core/app_design.dart';
+import '../../widgets/service_logo.dart';
 import 'checkout_subscription_screen.dart';
 
 class AddSubscriptionScreen extends StatefulWidget {
@@ -71,7 +72,32 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
 
     final state = context.read<ServicesBloc>().state;
     if (state is! ServicesDataLoaded) {
-      context.read<ServicesBloc>().add(const ServicesLoaded());
+      context.read<ServicesBloc>().add(ServicesLoaded());
+    }
+    if (context.read<WalletBloc>().state is WalletInitial) {
+      context.read<WalletBloc>().add(WalletLoaded());
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _selectPrimaryCard(context.read<WalletBloc>().state, notify: false);
+  }
+
+  void _selectPrimaryCard(WalletState state, {bool notify = true}) {
+    if (_cardId != null || state is! WalletData || state.cards.isEmpty) return;
+
+    final primaryCardId = state.primaryCardId;
+    final primaryCard = state.cards.firstWhere(
+      (card) => card.id == primaryCardId || card.isPrimary,
+      orElse: () => state.cards.first,
+    );
+
+    if (notify && mounted) {
+      setState(() => _cardId = primaryCard.id);
+    } else {
+      _cardId = primaryCard.id;
     }
   }
 
@@ -116,6 +142,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
           child: CheckoutSubscriptionScreen(
             service: _svc!,
             initialPlan: _richPlan,
+            initialCardId: _cardId,
           ),
         ),
       ),
@@ -124,25 +151,27 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
   }
 
   Widget _svcLogo(ServiceModel svc, {double size = 28}) {
-    final hasLogo = svc.logoUrl != null && svc.logoUrl!.isNotEmpty;
-    if (hasLogo) {
-      return SizedBox(
-        width: size, height: size,
-        child: Image.network(svc.logoUrl!, fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => Text(svc.icon, style: TextStyle(fontSize: size * 0.9))),
-      );
-    }
-    return Text(svc.icon, style: TextStyle(fontSize: size * 0.9));
+    return SizedBox(
+      width: size,
+      height: size,
+      child: ServiceLogo(
+        serviceName: svc.name,
+        logoUrl: svc.logoUrl,
+        fallbackIcon: svc.icon,
+        fallbackFontSize: size * 0.9,
+        padding: EdgeInsets.all(size * 0.08),
+      ),
+    );
   }
 
   Widget _label(String t) => Padding(
-        padding: const EdgeInsets.only(top: 22, bottom: 10),
-        child: Text(t, style: const TextStyle(color: D.white, fontWeight: FontWeight.w700, fontSize: 14)),
+        padding: EdgeInsets.only(top: 22, bottom: 10),
+        child: Text(t, style: TextStyle(color: D.white, fontWeight: FontWeight.w700, fontSize: 14)),
       );
 
   Widget _box({required Widget child, bool glowCyan = false}) => Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(16),
         decoration: glowCyan
             ? D.glowCard(accent: D.cyan, bg: D.cardBg, radius: D.r20)
             : D.plainCard(),
@@ -152,8 +181,8 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
   Widget _chip(String text, bool active, VoidCallback onTap) => GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          duration: Duration(milliseconds: 200),
+          padding: EdgeInsets.symmetric(horizontal: 18, vertical: 10),
           decoration: BoxDecoration(
             color: active ? D.cyan : D.cardBg,
             borderRadius: D.r16,
@@ -162,7 +191,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
           ),
           child: Text(text,
               style: TextStyle(
-                  color: active ? const Color(0xFF0D1A1C) : D.textSub,
+                  color: active ? Color(0xFF0D1A1C) : D.textSub,
                   fontWeight: FontWeight.w700)),
         ),
       );
@@ -176,9 +205,9 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
         _cycle = _capitalizeCycle(plan.billingCycle);
       }),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
+        duration: Duration(milliseconds: 200),
+        margin: EdgeInsets.only(bottom: 10),
+        padding: EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: isSelected ? D.cyan.withValues(alpha: 0.08) : D.cardBg,
           borderRadius: D.r16,
@@ -196,14 +225,14 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                 style: TextStyle(
                     color: isSelected ? D.cyan : D.white,
                     fontWeight: FontWeight.w800, fontSize: 14)),
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Text('\$${plan.price.toStringAsFixed(2)} / ${_cycleFull(plan.billingCycle)}',
                 style: TextStyle(
                     color: isSelected ? D.cyan.withValues(alpha: 0.75) : D.textSub,
                     fontSize: 12, fontWeight: FontWeight.w600)),
           ])),
           AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
+            duration: Duration(milliseconds: 200),
             width: 20, height: 20,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
@@ -213,7 +242,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                 width: 1.5,
               ),
             ),
-            child: isSelected ? const Icon(Icons.check, color: Colors.black, size: 12) : null,
+            child: isSelected ? Icon(Icons.check, color: Colors.black, size: 12) : null,
           ),
         ]),
       ),
@@ -241,19 +270,19 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
         body: SafeArea(
           child: Column(children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 16, 20, 0),
+              padding: EdgeInsets.fromLTRB(8, 16, 20, 0),
               child: Row(children: [
                 IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: D.white),
+                  icon: Icon(Icons.arrow_back_ios_new_rounded, color: D.white),
                 ),
-                const Text('Add Subscription',
+                Text('Add Subscription',
                     style: TextStyle(color: D.white, fontSize: 22, fontWeight: FontWeight.w900)),
               ]),
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -264,12 +293,12 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                         glowCyan: true,
                         child: Row(children: [
                           _svcLogo(_svc!),
-                          const SizedBox(width: 12),
+                          SizedBox(width: 12),
                           Expanded(child: Text(_svc!.name,
-                              style: const TextStyle(color: D.white, fontWeight: FontWeight.w800, fontSize: 16))),
+                              style: TextStyle(color: D.white, fontWeight: FontWeight.w800, fontSize: 16))),
                           TextButton(
                             onPressed: () => setState(() { _svc = null; _plan = null; _richPlan = null; }),
-                            child: const Text('Change', style: TextStyle(color: D.cyan)),
+                            child: Text('Change', style: TextStyle(color: D.cyan)),
                           ),
                         ]),
                       )
@@ -278,7 +307,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                         builder: (context, state) {
                           final list = state is ServicesDataLoaded ? state.services : <ServiceModel>[];
                           if (list.isEmpty) {
-                            return const Padding(
+                            return Padding(
                               padding: EdgeInsets.all(16),
                               child: Text('Loading services...', style: TextStyle(color: D.textSub)),
                             );
@@ -291,15 +320,15 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                                 context.read<ServicesBloc>().add(ServiceDetailRequested(s.id));
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                                 decoration: BoxDecoration(
                                   color: D.cardBg, borderRadius: D.r16,
                                   border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
                                 ),
                                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                                   _svcLogo(s, size: 22),
-                                  const SizedBox(width: 6),
-                                  Text(s.name, style: const TextStyle(color: D.white, fontWeight: FontWeight.w700)),
+                                  SizedBox(width: 6),
+                                  Text(s.name, style: TextStyle(color: D.white, fontWeight: FontWeight.w700)),
                                 ]),
                               ),
                             )).toList(),
@@ -314,7 +343,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                         final detailPlans = svcState is ServicesDataLoaded &&
                                 svcState.detailServiceId == _svc!.id
                             ? svcState.detailPlans
-                            : const <ServicePlan>[];
+                            : <ServicePlan>[];
 
                         if (detailPlans.isNotEmpty) {
                           return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -326,24 +355,24 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                           return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             _label('Plan'),
                             Wrap(spacing: 10, children: _svc!.plans.map((p) => Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
+                              padding: EdgeInsets.only(bottom: 10),
                               child: _chip(p, _plan == p, () => setState(() => _plan = p)),
                             )).toList()),
                           ]);
                         }
-                        return const SizedBox.shrink();
+                        return SizedBox.shrink();
                       }),
 
                     // ── Amount ─────────────────────────────────────────────
                     _label('Amount'),
                     _box(
                       child: Row(children: [
-                        const Text('\$ ', style: TextStyle(color: D.cyan, fontWeight: FontWeight.w900, fontSize: 20)),
+                        Text('\$ ', style: TextStyle(color: D.cyan, fontWeight: FontWeight.w900, fontSize: 20)),
                         Text(
                           _svc == null ? '—' : _computedAmount.toStringAsFixed(2),
-                          style: const TextStyle(color: D.white, fontWeight: FontWeight.w700, fontSize: 20),
+                          style: TextStyle(color: D.white, fontWeight: FontWeight.w700, fontSize: 20),
                         ),
-                        const Spacer(),
+                        Spacer(),
                         if (_svc != null && _richPlan == null)
                           Tooltip(
                             message: 'Pricing is estimated. Select a plan for exact pricing.',
@@ -351,13 +380,13 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                           ),
                         if (_richPlan != null)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
                               color: D.cyan.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(color: D.cyan.withValues(alpha: 0.30)),
                             ),
-                            child: const Text('Exact price',
+                            child: Text('Exact price',
                                 style: TextStyle(color: D.cyan, fontSize: 10, fontWeight: FontWeight.w700)),
                           ),
                       ]),
@@ -374,14 +403,16 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
 
                     // ── Card ───────────────────────────────────────────────
                     _label('Payment Card'),
-                    BlocBuilder<WalletBloc, WalletState>(
+                    BlocConsumer<WalletBloc, WalletState>(
+                      listener: (context, walletState) =>
+                          _selectPrimaryCard(walletState),
                       builder: (context, walletState) {
                         if (walletState is! WalletData || walletState.cards.isEmpty) {
                           return _box(
                             child: Row(children: [
-                              const Icon(Icons.info_outline_rounded, color: D.cyan, size: 16),
-                              const SizedBox(width: 10),
-                              const Expanded(child: Text(
+                              Icon(Icons.info_outline_rounded, color: D.cyan, size: 16),
+                              SizedBox(width: 10),
+                              Expanded(child: Text(
                                 'Please add a card in the Wallet tab first.',
                                 style: TextStyle(color: D.textSub),
                               )),
@@ -394,21 +425,21 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                               _cardId = card.id;
                             }),
                             child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              margin: const EdgeInsets.only(bottom: 10),
-                              padding: const EdgeInsets.all(14),
+                              duration: Duration(milliseconds: 200),
+                              margin: EdgeInsets.only(bottom: 10),
+                              padding: EdgeInsets.all(14),
                               decoration: _cardId == card.id
                                   ? D.glowCard(accent: D.cyan, bg: D.cardBg, radius: D.r16)
                                   : D.plainCard(radius: D.r16),
                               child: Row(children: [
-                                const Icon(Icons.credit_card_rounded, color: D.cyan),
-                                const SizedBox(width: 12),
+                                Icon(Icons.credit_card_rounded, color: D.cyan),
+                                SizedBox(width: 12),
                                 Expanded(child: Text(
                                   '${card.nickname}  ••••  ${card.maskedPan.length >= 4 ? card.maskedPan.substring(card.maskedPan.length - 4) : card.maskedPan}',
-                                  style: const TextStyle(color: D.white, fontWeight: FontWeight.w700),
+                                  style: TextStyle(color: D.white, fontWeight: FontWeight.w700),
                                 )),
                                 if (_cardId == card.id)
-                                  const Icon(Icons.check_circle_rounded, color: D.cyan, size: 20),
+                                  Icon(Icons.check_circle_rounded, color: D.cyan, size: 20),
                               ]),
                             ),
                           )).toList(),
@@ -431,10 +462,10 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                     _box(
                       child: Column(children: [
                         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                          const Text('Days before renewal',
+                          Text('Days before renewal',
                               style: TextStyle(color: D.textSub, fontWeight: FontWeight.w600)),
                           Text('$_remindDays days',
-                              style: const TextStyle(color: D.cyan, fontWeight: FontWeight.w800)),
+                              style: TextStyle(color: D.cyan, fontWeight: FontWeight.w800)),
                         ]),
                         SliderTheme(
                           data: SliderTheme.of(context).copyWith(
@@ -451,27 +482,27 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
                       ]),
                     ),
 
-                    const SizedBox(height: 30),
+                    SizedBox(height: 30),
                     SizedBox(
                       width: double.infinity, height: 58,
                       child: ElevatedButton(
                         onPressed: _canSubmit ? _submit : null,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: _canSubmit ? D.orange : const Color(0xFF2A2A2A),
+                          backgroundColor: _canSubmit ? D.orange : Color(0xFF2A2A2A),
                           foregroundColor: D.white,
                           shape: RoundedRectangleBorder(borderRadius: D.r20),
                           elevation: 0,
                         ),
                         child: _isSubmitting
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 22, height: 22,
                                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                               )
-                            : const Text('Add Subscription',
+                            : Text('Add Subscription',
                                 style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
                       ),
                     ),
-                    const SizedBox(height: 30),
+                    SizedBox(height: 30),
                   ],
                 ),
               ),

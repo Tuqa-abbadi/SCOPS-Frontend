@@ -6,7 +6,7 @@
       "request": "launch",
       "type": "dart",
       "toolArgs": [
-        "--dart-define=API_BASE_URL=https://differ-villas-sheep-properties.trycloudflare.com/api/"
+        "--dart-define=API_BASE_URL=https://overgenerous-supercerebrally-russel.ngrok-free.dev/api/"
       ]
     }
   ]

@@ -351,7 +351,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 opacity: 0.14,
               ),
               SafeArea(
-                child: Padding(
+                child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(22, 8, 22, 24),
                   child: Column(
                     children: [
@@ -417,8 +417,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
-                      const Spacer(),
-                
                     ],
                   ),
                 ),

@@ -6,6 +6,8 @@ import '../../blocs/services/services_bloc.dart';
 import '../../blocs/subscription/subscription_bloc.dart';
 import '../../blocs/wallet/wallet_bloc.dart';
 import '../../core/app_design.dart';
+import '../../core/theme/app_colors.dart';
+import '../../widgets/service_logo.dart';
 import '../dashboard/dashboard_screen.dart';
 
 class CheckoutSubscriptionScreen extends StatefulWidget {
@@ -13,10 +15,12 @@ class CheckoutSubscriptionScreen extends StatefulWidget {
     super.key,
     required this.service,
     this.initialPlan,
+    this.initialCardId,
   });
 
   final ServiceModel service;
   final ServicePlan? initialPlan;
+  final String? initialCardId;
 
   @override
   State<CheckoutSubscriptionScreen> createState() =>
@@ -38,6 +42,8 @@ class _CheckoutSubscriptionScreenState
 
   static const _priorities = ['high', 'medium', 'low'];
 
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+
   @override
   void initState() {
     super.initState();
@@ -51,7 +57,7 @@ class _CheckoutSubscriptionScreenState
       );
     }
     if (context.read<WalletBloc>().state is WalletInitial) {
-      context.read<WalletBloc>().add(const WalletLoaded());
+      context.read<WalletBloc>().add(WalletLoaded());
     }
   }
 
@@ -59,12 +65,60 @@ class _CheckoutSubscriptionScreenState
   void didChangeDependencies() {
     super.didChangeDependencies();
     _paymentBloc ??= context.read<PaymentBloc>();
+    _selectInitialCard(context.read<WalletBloc>().state, notify: false);
+  }
+
+  void _selectInitialCard(WalletState state, {bool notify = true}) {
+    if (_card != null) return;
+
+    final cards = state is WalletData
+        ? state.cards
+        : state is WalletAddingCard
+        ? state.cards
+        : state is WalletSetupIntentReady
+        ? state.cards
+        : state is WalletError
+        ? state.cards
+        : <CardModel>[];
+    final primaryCardId = state is WalletData
+        ? state.primaryCardId
+        : state is WalletAddingCard
+        ? state.primaryCardId
+        : state is WalletSetupIntentReady
+        ? state.primaryCardId
+        : state is WalletError
+        ? state.primaryCardId
+        : null;
+
+    if (cards.isEmpty) return;
+    CardModel? selectedCard;
+    for (final card in cards) {
+      if (card.id == widget.initialCardId) {
+        selectedCard = card;
+        break;
+      }
+    }
+    if (selectedCard == null) {
+      for (final card in cards) {
+        if (card.id == primaryCardId || card.isPrimary) {
+          selectedCard = card;
+          break;
+        }
+      }
+    }
+    selectedCard ??= cards.first;
+
+    if (notify && mounted) {
+      setState(() => _card = selectedCard);
+    } else {
+      _card = selectedCard;
+    }
   }
 
   @override
   void dispose() {
     _emailCtrl.dispose();
-    _paymentBloc?.add(const PaymentReset());
+    _paymentBloc?.add(PaymentReset());
     super.dispose();
   }
 
@@ -78,11 +132,11 @@ class _CheckoutSubscriptionScreenState
     final now = DateTime.now();
     switch (_billingCycle.toLowerCase()) {
       case 'weekly':
-        return now.add(const Duration(days: 7));
+        return now.add(Duration(days: 7));
       case 'yearly':
-        return now.add(const Duration(days: 365));
+        return now.add(Duration(days: 365));
       default:
-        return now.add(const Duration(days: 30));
+        return now.add(Duration(days: 30));
     }
   }
 
@@ -191,20 +245,20 @@ class _CheckoutSubscriptionScreenState
       context: context,
       barrierDismissible: false,
       builder: (dialogCtx) => AlertDialog(
-        backgroundColor: const Color(0xFF07111C),
+        backgroundColor: _isDark ? Color(0xFF07111C) : AppColors.lightSurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
+        title: Text(
           'Confirm checkout',
           style: TextStyle(color: D.white, fontWeight: FontWeight.w900),
         ),
         content: Text(
           'You are paying for ${widget.service.name} account: $email\n\nPlan: $_planName\nPayment ID: ${state.paymentId}',
-          style: const TextStyle(color: D.textSub, height: 1.5),
+          style: TextStyle(color: D.textSub, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx, false),
-            child: const Text('Cancel', style: TextStyle(color: D.textSub)),
+            child: Text('Cancel', style: TextStyle(color: D.textSub)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(dialogCtx, true),
@@ -212,7 +266,7 @@ class _CheckoutSubscriptionScreenState
               backgroundColor: D.cyan,
               foregroundColor: Colors.black,
             ),
-            child: const Text(
+            child: Text(
               'Confirm',
               style: TextStyle(fontWeight: FontWeight.w900),
             ),
@@ -223,7 +277,7 @@ class _CheckoutSubscriptionScreenState
     if (confirmed == true) {
       context.read<PaymentBloc>().add(PaymentConfirmed(state.paymentId));
     } else {
-      context.read<PaymentBloc>().add(const PaymentDeclined());
+      context.read<PaymentBloc>().add(PaymentDeclined());
     }
   }
 
@@ -234,8 +288,10 @@ class _CheckoutSubscriptionScreenState
     setState(() => _savingSubscription = true);
 
     // The backend creates the subscription when the payment is confirmed.
-    // Just refresh the local subscription list so the new one appears.
-    context.read<SubscriptionBloc>().add(const SubscriptionsRefreshRequested());
+    // Refresh both affected stores so the new subscription and the card's
+    // reduced balance are reflected throughout the app.
+    context.read<SubscriptionBloc>().add(SubscriptionsRefreshRequested());
+    context.read<WalletBloc>().add(WalletLoaded());
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
@@ -256,7 +312,6 @@ class _CheckoutSubscriptionScreenState
   }
 
   Widget _logo({double size = 56}) {
-    final logo = widget.service.logoUrl;
     return Container(
       width: size,
       height: size,
@@ -266,27 +321,21 @@ class _CheckoutSubscriptionScreenState
         border: Border.all(color: widget.service.color.withValues(alpha: .45)),
       ),
       clipBehavior: Clip.antiAlias,
-      child: logo != null && logo.isNotEmpty
-          ? Image.network(
-              logo,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) =>
-                  Center(child: Text(widget.service.icon)),
-            )
-          : Center(
-              child: Text(
-                widget.service.icon,
-                style: TextStyle(fontSize: size * .45),
-              ),
-            ),
+      child: ServiceLogo(
+        serviceName: widget.service.name,
+        logoUrl: widget.service.logoUrl,
+        fallbackIcon: widget.service.icon,
+        fallbackFontSize: size * .45,
+        padding: EdgeInsets.all(size * .1),
+      ),
     );
   }
 
   Widget _label(String text) => Padding(
-    padding: const EdgeInsets.only(top: 22, bottom: 10),
+    padding: EdgeInsets.only(top: 22, bottom: 10),
     child: Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         color: D.white,
         fontWeight: FontWeight.w800,
         fontSize: 14,
@@ -296,7 +345,7 @@ class _CheckoutSubscriptionScreenState
 
   Widget _cardBox(Widget child) => Container(
     width: double.infinity,
-    padding: const EdgeInsets.all(16),
+    padding: EdgeInsets.all(16),
     decoration: D.plainCard(radius: D.r16),
     child: child,
   );
@@ -309,9 +358,9 @@ class _CheckoutSubscriptionScreenState
         _fallbackPlan = null;
       }),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
+        duration: Duration(milliseconds: 180),
+        margin: EdgeInsets.only(bottom: 10),
+        padding: EdgeInsets.all(14),
         decoration: selected
             ? D.glowCard(accent: D.cyan, bg: D.cardBg, radius: D.r16)
             : D.plainCard(radius: D.r16),
@@ -328,15 +377,15 @@ class _CheckoutSubscriptionScreenState
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: 4),
                   Text(
                     '\$${plan.price.toStringAsFixed(2)} / ${_cycleUnit(plan.billingCycle)}',
-                    style: const TextStyle(color: D.textSub, fontSize: 12),
+                    style: TextStyle(color: D.textSub, fontSize: 12),
                   ),
                 ],
               ),
             ),
-            if (selected) const Icon(Icons.check_circle_rounded, color: D.cyan),
+            if (selected) Icon(Icons.check_circle_rounded, color: D.cyan),
           ],
         ),
       ),
@@ -347,13 +396,17 @@ class _CheckoutSubscriptionScreenState
       GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          duration: Duration(milliseconds: 180),
+          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: selected ? D.cyan : D.cardBg,
             borderRadius: D.r16,
             border: Border.all(
-              color: selected ? D.cyan : Colors.white.withValues(alpha: .08),
+              color: selected
+                  ? D.cyan
+                  : _isDark
+                  ? Colors.white.withValues(alpha: .08)
+                  : AppColors.lightBorder,
             ),
           ),
           child: Text(
@@ -367,22 +420,19 @@ class _CheckoutSubscriptionScreenState
       );
 
   Widget _summaryRow(String label, String value) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
+    padding: EdgeInsets.only(bottom: 10),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(color: D.textSub, fontSize: 13),
-          ),
+          child: Text(label, style: TextStyle(color: D.textSub, fontSize: 13)),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: 12),
         Flexible(
           child: Text(
             value,
             textAlign: TextAlign.right,
-            style: const TextStyle(
+            style: TextStyle(
               color: D.white,
               fontWeight: FontWeight.w800,
               fontSize: 13,
@@ -410,22 +460,22 @@ class _CheckoutSubscriptionScreenState
         }
       },
       child: Scaffold(
-        backgroundColor: D.bg,
+        backgroundColor: _isDark ? D.bg : AppColors.lightBackground,
         body: SafeArea(
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(8, 14, 20, 0),
+                padding: EdgeInsets.fromLTRB(8, 14, 20, 0),
                 child: Row(
                   children: [
                     IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.arrow_back_ios_new_rounded,
                         color: D.white,
                       ),
                     ),
-                    const Text(
+                    Text(
                       'Checkout',
                       style: TextStyle(
                         color: D.white,
@@ -440,7 +490,7 @@ class _CheckoutSubscriptionScreenState
                 child: Form(
                   key: _formKey,
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+                    padding: EdgeInsets.fromLTRB(20, 14, 20, 24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -448,25 +498,25 @@ class _CheckoutSubscriptionScreenState
                           Row(
                             children: [
                               _logo(size: 62),
-                              const SizedBox(width: 14),
+                              SizedBox(width: 14),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       widget.service.name,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: D.white,
                                         fontSize: 20,
                                         fontWeight: FontWeight.w900,
                                       ),
                                     ),
-                                    const SizedBox(height: 5),
+                                    SizedBox(height: 5),
                                     Text(
                                       widget.service.category.isEmpty
                                           ? 'Subscription service'
                                           : widget.service.category,
-                                      style: const TextStyle(color: D.textSub),
+                                      style: TextStyle(color: D.textSub),
                                     ),
                                   ],
                                 ),
@@ -478,13 +528,13 @@ class _CheckoutSubscriptionScreenState
                         TextFormField(
                           controller: _emailCtrl,
                           keyboardType: TextInputType.emailAddress,
-                          style: const TextStyle(color: D.white),
+                          style: TextStyle(color: D.white),
                           decoration: InputDecoration(
                             hintText: 'example@gmail.com',
-                            hintStyle: const TextStyle(color: D.textSub),
+                            hintStyle: TextStyle(color: D.textSub),
                             filled: true,
                             fillColor: D.cardBg,
-                            prefixIcon: const Icon(
+                            prefixIcon: Icon(
                               Icons.alternate_email_rounded,
                               color: D.cyan,
                             ),
@@ -504,8 +554,8 @@ class _CheckoutSubscriptionScreenState
                             return null;
                           },
                         ),
-                        const SizedBox(height: 8),
-                        const Text(
+                        SizedBox(height: 8),
+                        Text(
                           'This can be different from your SCOPS account email.',
                           style: TextStyle(color: D.textSub, fontSize: 12),
                         ),
@@ -516,7 +566,7 @@ class _CheckoutSubscriptionScreenState
                                 state is ServicesDataLoaded &&
                                     state.detailServiceId == widget.service.id
                                 ? state.detailPlans
-                                : const <ServicePlan>[];
+                                : <ServicePlan>[];
                             if (plans.isNotEmpty) {
                               return Column(
                                 children: plans.map(_planTile).toList(),
@@ -526,7 +576,7 @@ class _CheckoutSubscriptionScreenState
                               return _cardBox(
                                 Text(
                                   _planName,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: D.white,
                                     fontWeight: FontWeight.w800,
                                   ),
@@ -550,18 +600,22 @@ class _CheckoutSubscriptionScreenState
                           },
                         ),
                         _label('Payment card'),
-                        BlocBuilder<WalletBloc, WalletState>(
+                        BlocConsumer<WalletBloc, WalletState>(
+                          listener: (context, state) =>
+                              _selectInitialCard(state),
                           builder: (context, state) {
                             final cards = state is WalletData
                                 ? state.cards
                                 : state is WalletAddingCard
                                 ? state.cards
+                                : state is WalletSetupIntentReady
+                                ? state.cards
                                 : state is WalletError
                                 ? state.cards
-                                : const <CardModel>[];
+                                : <CardModel>[];
                             if (cards.isEmpty) {
                               return _cardBox(
-                                const Row(
+                                Row(
                                   children: [
                                     Icon(
                                       Icons.info_outline_rounded,
@@ -589,9 +643,9 @@ class _CheckoutSubscriptionScreenState
                                 return GestureDetector(
                                   onTap: () => setState(() => _card = card),
                                   child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 180),
-                                    margin: const EdgeInsets.only(bottom: 10),
-                                    padding: const EdgeInsets.all(14),
+                                    duration: Duration(milliseconds: 180),
+                                    margin: EdgeInsets.only(bottom: 10),
+                                    padding: EdgeInsets.all(14),
                                     decoration: selected
                                         ? D.glowCard(
                                             accent: D.cyan,
@@ -601,22 +655,22 @@ class _CheckoutSubscriptionScreenState
                                         : D.plainCard(radius: D.r16),
                                     child: Row(
                                       children: [
-                                        const Icon(
+                                        Icon(
                                           Icons.credit_card_rounded,
                                           color: D.cyan,
                                         ),
-                                        const SizedBox(width: 12),
+                                        SizedBox(width: 12),
                                         Expanded(
                                           child: Text(
                                             '${card.nickname}  **** $last4',
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               color: D.white,
                                               fontWeight: FontWeight.w800,
                                             ),
                                           ),
                                         ),
                                         if (selected)
-                                          const Icon(
+                                          Icon(
                                             Icons.check_circle_rounded,
                                             color: D.cyan,
                                           ),
@@ -650,18 +704,18 @@ class _CheckoutSubscriptionScreenState
                                   );
                                 }).toList(),
                               ),
-                              const SizedBox(height: 16),
+                              SizedBox(height: 16),
                               Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Renewal reminder',
                                     style: TextStyle(color: D.textSub),
                                   ),
                                   Text(
                                     '$_remindDays days before',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       color: D.cyan,
                                       fontWeight: FontWeight.w800,
                                     ),
@@ -706,7 +760,7 @@ class _CheckoutSubscriptionScreenState
                             ],
                           ),
                         ),
-                        const SizedBox(height: 28),
+                        SizedBox(height: 28),
                         BlocBuilder<PaymentBloc, PaymentState>(
                           builder: (context, state) {
                             final loading =
@@ -720,15 +774,21 @@ class _CheckoutSubscriptionScreenState
                                 onPressed: loading ? null : _startCheckout,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: _isPaymentBusy
-                                      ? const Color(0xFF2A2A2A)
+                                      ? _isDark
+                                            ? Color(0xFF2A2A2A)
+                                            : AppColors.lightSecondarySurface
                                       : D.orange,
-                                  foregroundColor: D.white,
+                                  foregroundColor: _isDark
+                                      ? D.white
+                                      : Theme.of(
+                                          context,
+                                        ).colorScheme.onSecondary,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: D.r20,
                                   ),
                                 ),
                                 child: loading
-                                    ? const SizedBox(
+                                    ? SizedBox(
                                         width: 22,
                                         height: 22,
                                         child: CircularProgressIndicator(
@@ -736,7 +796,7 @@ class _CheckoutSubscriptionScreenState
                                           strokeWidth: 2.5,
                                         ),
                                       )
-                                    : const Text(
+                                    : Text(
                                         'Pay and activate',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w900,
@@ -795,22 +855,19 @@ class CheckoutReceiptScreen extends StatelessWidget {
   String _date(DateTime d) => '${d.day}/${d.month}/${d.year}';
 
   Widget _row(String label, String value) => Padding(
-    padding: const EdgeInsets.only(bottom: 13),
+    padding: EdgeInsets.only(bottom: 13),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(color: D.textSub, fontSize: 13),
-          ),
+          child: Text(label, style: TextStyle(color: D.textSub, fontSize: 13)),
         ),
-        const SizedBox(width: 14),
+        SizedBox(width: 14),
         Flexible(
           child: Text(
             value,
             textAlign: TextAlign.right,
-            style: const TextStyle(
+            style: TextStyle(
               color: D.white,
               fontWeight: FontWeight.w800,
               fontSize: 13,
@@ -823,20 +880,21 @@ class CheckoutReceiptScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final last4 = card.maskedPan.length >= 4
         ? card.maskedPan.substring(card.maskedPan.length - 4)
         : card.maskedPan;
     return Scaffold(
-      backgroundColor: D.bg,
+      backgroundColor: isDark ? D.bg : AppColors.lightBackground,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+          padding: EdgeInsets.fromLTRB(20, 24, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               IconButton(
                 onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close_rounded, color: D.white),
+                icon: Icon(Icons.close_rounded, color: D.white),
               ),
               Expanded(
                 child: SingleChildScrollView(
@@ -852,32 +910,32 @@ class CheckoutReceiptScreen extends StatelessWidget {
                             color: D.cyan.withValues(alpha: .35),
                           ),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.check_rounded,
                           color: D.cyan,
                           size: 42,
                         ),
                       ),
-                      const SizedBox(height: 18),
+                      SizedBox(height: 18),
                       Text(
                         '${service.name} activated',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: D.white,
                           fontSize: 24,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                       Text(
                         'Your ${service.name} subscription has been activated for $serviceAccountEmail.',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: D.textSub, height: 1.5),
+                        style: TextStyle(color: D.textSub, height: 1.5),
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: 24),
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(18),
+                        padding: EdgeInsets.all(18),
                         decoration: D.glowCard(
                           accent: D.cyan,
                           bg: D.cardBg,
@@ -945,10 +1003,12 @@ class CheckoutReceiptScreen extends StatelessWidget {
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: D.orange,
-                    foregroundColor: D.white,
+                    foregroundColor: isDark
+                        ? D.white
+                        : Theme.of(context).colorScheme.onSecondary,
                     shape: RoundedRectangleBorder(borderRadius: D.r20),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Done',
                     style: TextStyle(fontWeight: FontWeight.w900),
                   ),

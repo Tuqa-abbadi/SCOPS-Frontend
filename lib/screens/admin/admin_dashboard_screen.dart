@@ -14,6 +14,7 @@ import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/subscription/subscription_bloc.dart';
 import '../../blocs/user/user_cubit.dart';
 import '../../blocs/wallet/wallet_bloc.dart';
+import '../../widgets/service_logo.dart';
 import '../auth/auth_choice_screen.dart';
 
 // ── Palette ───────────────────────────────────────────────────────────────────
@@ -2845,18 +2846,6 @@ class _SubTile extends StatelessWidget {
   }
 
   Widget _subLogo(Color color) {
-    final logoUrl = sub.serviceLogoUrl;
-    final fallback = Center(
-      child: Text(
-        sub.serviceName.isNotEmpty ? sub.serviceName[0].toUpperCase() : '?',
-        style: const TextStyle(
-          color: _white,
-          fontSize: 16,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
-
     return Container(
       width: 44,
       height: 44,
@@ -2866,13 +2855,15 @@ class _SubTile extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.24)),
       ),
       clipBehavior: Clip.antiAlias,
-      child: logoUrl != null && logoUrl.isNotEmpty
-          ? Image.network(
-              logoUrl,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => fallback,
-            )
-          : fallback,
+      child: ServiceLogo(
+        serviceName: sub.serviceName,
+        logoUrl: sub.serviceLogoUrl,
+        fallbackIcon: sub.serviceName.isNotEmpty
+            ? sub.serviceName[0].toUpperCase()
+            : '?',
+        fallbackFontSize: 16,
+        padding: const EdgeInsets.all(5),
+      ),
     );
   }
 }
@@ -2888,9 +2879,6 @@ class _ServiceCard extends StatelessWidget {
   final AdminServiceModel service;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
-
-  bool get _hasLogo =>
-      service.logoUrl != null && service.logoUrl!.startsWith('http');
 
   @override
   Widget build(BuildContext context) => Container(
@@ -2965,9 +2953,7 @@ class _ServiceCard extends StatelessWidget {
       height: 56,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        color: _hasLogo
-            ? Colors.white.withValues(alpha: 0.06)
-            : _cyan.withValues(alpha: 0.10),
+        color: Colors.white.withValues(alpha: 0.06),
         border: Border.all(color: _cyan.withValues(alpha: 0.22), width: 1.0),
         boxShadow: [
           BoxShadow(
@@ -2979,42 +2965,16 @@ class _ServiceCard extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(15),
-        child: _hasLogo ? _networkLogo() : _initialsWidget(),
+        child: ServiceLogo(
+          serviceName: service.name,
+          logoUrl: service.logoUrl,
+          fallbackIcon: service.initials,
+          fallbackFontSize: 18,
+          padding: const EdgeInsets.all(6),
+        ),
       ),
     );
   }
-
-  Widget _networkLogo() => Image.network(
-    service.logoUrl!,
-    fit: BoxFit.contain,
-    width: 56,
-    height: 56,
-    loadingBuilder: (_, child, progress) {
-      if (progress == null) return child;
-      return Center(
-        child: SizedBox(
-          width: 18,
-          height: 18,
-          child: CircularProgressIndicator(
-            strokeWidth: 1.5,
-            color: _cyan.withValues(alpha: 0.50),
-          ),
-        ),
-      );
-    },
-    errorBuilder: (_, __, ___) => _initialsWidget(),
-  );
-
-  Widget _initialsWidget() => Center(
-    child: Text(
-      service.initials,
-      style: const TextStyle(
-        color: _cyan,
-        fontSize: 20,
-        fontWeight: FontWeight.w900,
-      ),
-    ),
-  );
 
   Widget _iconBtn(IconData icon, Color color, VoidCallback onTap) =>
       GestureDetector(

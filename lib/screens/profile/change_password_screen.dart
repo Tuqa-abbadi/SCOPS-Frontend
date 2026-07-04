@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../blocs/profile/change_password_bloc.dart';
@@ -13,13 +14,16 @@ class ChangePasswordScreen extends StatefulWidget {
 }
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
-  static const _bg = Color(0xFF020812);
-  static const _card = Color(0xFF07111C);
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _bg => _isDark ? Color(0xFF020812) : AppColors.lightBackground;
+  Color get _card => _isDark ? Color(0xFF07111C) : AppColors.lightSurface;
   static const _cyan = Color(0xFF18E8F2);
   static const _orange = Color(0xFFFF5A14);
-  static const _white = Colors.white;
-  static const _muted = Color(0xFF9BA4B0);
-  static const _fieldBg = Color(0xFF0D1520);
+  Color get _white => _isDark ? Colors.white : AppColors.lightTextPrimary;
+  Color get _muted =>
+      _isDark ? Color(0xFF9BA4B0) : AppColors.lightTextSecondary;
+  Color get _fieldBg =>
+      _isDark ? Color(0xFF0D1520) : AppColors.lightSecondarySurface;
 
   final _currentCtrl = TextEditingController();
   final _newCtrl = TextEditingController();
@@ -67,19 +71,15 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     child: TextField(
       controller: ctrl,
       obscureText: !showText,
-      style: const TextStyle(
+      style: TextStyle(
         color: _white,
         fontWeight: FontWeight.w600,
         fontSize: 15,
       ),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: _muted),
-        prefixIcon: const Icon(
-          Icons.lock_outline_rounded,
-          color: _muted,
-          size: 20,
-        ),
+        hintStyle: TextStyle(color: _muted),
+        prefixIcon: Icon(Icons.lock_outline_rounded, color: _muted, size: 20),
         suffixIcon: IconButton(
           icon: Icon(
             showText
@@ -91,7 +91,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           onPressed: onToggle,
         ),
         border: InputBorder.none,
-        contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 4),
+        contentPadding: EdgeInsets.symmetric(vertical: 18, horizontal: 4),
       ),
     ),
   );
@@ -102,7 +102,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       listener: (context, state) {
         if (state is ChangePasswordSuccess) {
           _clearFields();
-          context.read<ChangePasswordBloc>().add(const ChangePasswordReset());
+          context.read<ChangePasswordBloc>().add(ChangePasswordReset());
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.message),
@@ -123,14 +123,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             backgroundColor: _bg,
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.arrow_back_ios_new_rounded,
                 color: _white,
                 size: 20,
               ),
               onPressed: () => Navigator.pop(context),
             ),
-            title: const Text(
+            title: Text(
               'Change Password',
               style: TextStyle(
                 color: _white,
@@ -141,13 +141,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           ),
           body: SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+              padding: EdgeInsets.fromLTRB(24, 8, 24, 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(20),
+                    padding: EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: _card,
                       borderRadius: BorderRadius.circular(20),
@@ -156,7 +156,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Update your password',
                           style: TextStyle(
                             color: _white,
@@ -164,12 +164,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        const Text(
+                        SizedBox(height: 4),
+                        Text(
                           'Use a strong password you don\'t use elsewhere.',
                           style: TextStyle(color: _muted, fontSize: 12),
                         ),
-                        const SizedBox(height: 20),
+                        SizedBox(height: 20),
                         _field(
                           ctrl: _currentCtrl,
                           hint: 'Current password',
@@ -177,14 +177,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           onToggle: () =>
                               setState(() => _showCurrent = !_showCurrent),
                         ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12),
                         _field(
                           ctrl: _newCtrl,
                           hint: 'New password',
                           showText: _showNew,
                           onToggle: () => setState(() => _showNew = !_showNew),
                         ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12),
                         _field(
                           ctrl: _confirmCtrl,
                           hint: 'Confirm new password',
@@ -193,10 +193,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                               setState(() => _showConfirm = !_showConfirm),
                         ),
                         if (errorText != null) ...[
-                          const SizedBox(height: 14),
+                          SizedBox(height: 14),
                           Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
+                            padding: EdgeInsets.symmetric(
                               horizontal: 14,
                               vertical: 10,
                             ),
@@ -209,7 +209,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                             ),
                             child: Text(
                               errorText,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: _orange,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -217,7 +217,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                             ),
                           ),
                         ],
-                        const SizedBox(height: 20),
+                        SizedBox(height: 20),
                         SizedBox(
                           width: double.infinity,
                           height: 54,
@@ -237,7 +237,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                               elevation: 0,
                             ),
                             child: isLoading
-                                ? const SizedBox(
+                                ? SizedBox(
                                     width: 22,
                                     height: 22,
                                     child: CircularProgressIndicator(
@@ -245,7 +245,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                       strokeWidth: 2.5,
                                     ),
                                   )
-                                : const Text(
+                                : Text(
                                     'Update Password',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w900,
@@ -254,7 +254,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                   ),
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12),
                         Center(
                           child: TextButton(
                             onPressed: () {
@@ -265,7 +265,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                   .trim();
                               if (email == null || email.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
+                                  SnackBar(
                                     content: Text(
                                       'We could not find your account email.',
                                     ),
@@ -287,7 +287,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                 ),
                               );
                             },
-                            child: const Text(
+                            child: Text(
                               'Forgot your password?',
                               style: TextStyle(
                                 color: _cyan,

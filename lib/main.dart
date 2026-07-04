@@ -17,6 +17,7 @@ import 'core/config/app_config.dart';
 import 'core/constants/api_constants.dart';
 import 'core/network/dio_client.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_controller.dart';
 import 'blocs/profile/change_password_bloc.dart';
 import 'repositories/auth_repository.dart';
 import 'repositories/profile_repository.dart';
@@ -37,13 +38,22 @@ Future<void> main() async {
   DioClient.init(baseUrl: ApiConstants.baseUrl, tokenStorage: tokenStorage);
   final authRepository = AuthRepository(tokenStorage: tokenStorage);
 
-  runApp(ScopsApp(authRepository: authRepository));
+  final themeController = await ThemeController.load();
+
+  runApp(
+    ScopsApp(authRepository: authRepository, themeController: themeController),
+  );
 }
 
 class ScopsApp extends StatelessWidget {
-  const ScopsApp({super.key, required this.authRepository});
+  const ScopsApp({
+    super.key,
+    required this.authRepository,
+    required this.themeController,
+  });
 
   final AuthRepository authRepository;
+  final ThemeController themeController;
 
   @override
   Widget build(BuildContext context) {
@@ -69,8 +79,7 @@ class ScopsApp extends StatelessWidget {
           create: (_) => ResetPasswordBloc(authRepository: authRepository),
         ),
         BlocProvider<EmailVerificationBloc>(
-          create: (_) =>
-              EmailVerificationBloc(authRepository: authRepository),
+          create: (_) => EmailVerificationBloc(authRepository: authRepository),
         ),
         BlocProvider<LogoutBloc>(
           create: (_) => LogoutBloc(authRepository: authRepository),
@@ -82,24 +91,24 @@ class ScopsApp extends StatelessWidget {
         BlocProvider<DashboardBloc>(create: (_) => DashboardBloc()),
         BlocProvider<ServicesBloc>(create: (_) => ServicesBloc()),
         BlocProvider<WalletBloc>(create: (_) => WalletBloc()),
-        BlocProvider<SubscriptionBloc>(
-          create: (_) => SubscriptionBloc(),
-        ),
-        BlocProvider<PaymentBloc>(
-          create: (_) => PaymentBloc(),
-        ),
-        BlocProvider<ReviewsBloc>(
-          create: (_) => ReviewsBloc(),
-        ),
-        BlocProvider<AdminBloc>(
-          create: (_) => AdminBloc(),
-        ),
+        BlocProvider<SubscriptionBloc>(create: (_) => SubscriptionBloc()),
+        BlocProvider<PaymentBloc>(create: (_) => PaymentBloc()),
+        BlocProvider<ReviewsBloc>(create: (_) => ReviewsBloc()),
+        BlocProvider<AdminBloc>(create: (_) => AdminBloc()),
       ],
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'SCOPS',
-        theme: AppTheme.darkTheme,
-        home: designMode ? const DashboardScreen() : const SplashScreen(),
+      child: ThemeControllerScope(
+        controller: themeController,
+        child: AnimatedBuilder(
+          animation: themeController,
+          builder: (context, _) => MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: 'SCOPS',
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: themeController.themeMode,
+            home: designMode ? const DashboardScreen() : const SplashScreen(),
+          ),
+        ),
       ),
     );
   }

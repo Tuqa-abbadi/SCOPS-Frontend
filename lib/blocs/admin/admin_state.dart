@@ -184,7 +184,7 @@ class AdminServiceModel extends Equatable {
       description: json['description'] as String? ?? '',
       categoryId: catId,
       categoryName: catName,
-      logoUrl: json['logo_url'] as String? ?? json['logo'] as String?,
+      logoUrl: resolveLogoUrlFromJson(json),
     );
   }
 

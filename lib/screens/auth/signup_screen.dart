@@ -53,6 +53,7 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   void _onNext(BuildContext context, SignupState state) {
+    FocusScope.of(context).unfocus();
     if (state.currentStep < 3) {
       context.read<SignupBloc>().add(const SignupNextStep());
     } else {
@@ -94,8 +95,10 @@ class _SignupScreenState extends State<SignupScreen> {
     return Row(
       children: [
         IconButton(
-          onPressed: () =>
-              context.read<SignupBloc>().add(const SignupPreviousStep()),
+          onPressed: () {
+            FocusScope.of(context).unfocus();
+            context.read<SignupBloc>().add(const SignupPreviousStep());
+          },
           icon: const Icon(
             Icons.arrow_back_ios_new_rounded,
             color: Colors.white,
@@ -409,10 +412,10 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Widget _cardSlider(SignupState state, BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOutCubic,
-      height: state.currentStep == 0 ? 315 : 245,
+    return SizedBox(
+      // Keep enough room for the taller name card while pages animate. Shrinking
+      // this viewport immediately made the outgoing name card overflow.
+      height: 315,
       child: PageView.builder(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(),

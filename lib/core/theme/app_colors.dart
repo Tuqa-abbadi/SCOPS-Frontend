@@ -30,6 +30,15 @@ class AppColors {
   static const warning = Color(0xFFFFB020);
   static const danger = Color(0xFFFF4D4D);
 
+  // SCOPS light style
+  static const lightBackground = Color(0xFFF8F6F0);
+  static const lightSurface = Color(0xFFFFFDF8);
+  static const lightSecondarySurface = Color(0xFFF1ECE2);
+  static const lightTextPrimary = Color(0xFF111827);
+  static const lightTextSecondary = Color(0xFF6B665C);
+  static const lightBorder = Color(0xFFE7DDC8);
+  static const lightNavBar = Color(0xFFFFFDF8);
+
   // Old aliases, keep them so code does not break
   static const bgDeep = background;
   static const bgDark = background2;
